@@ -1,0 +1,212 @@
+// Plane API 封装：把 URL 中的 workspace slug + sequence identifier (例如 CSDK-2)
+// 解析成 project_id + issue_id，再拉取 issue 详情、状态、标签、评论。
+//
+// 参考文档：https://docs.plane.so/api-reference
+
+// 每次调用时才读取，避免 ESM 模块加载顺序导致的"空值被固化"问题
+const getBase = () => process.env.PLANE_BASE_URL ?? "https://api.plane.so";
+const getToken = () => process.env.PLANE_API_TOKEN ?? "";
+
+// 简易内存缓存：避免每次都去 list projects
+const projectCache = new Map<string, PlaneProject[]>(); // workspaceSlug -> projects
+const issueIdCache = new Map<string, { projectId: string; issueId: string }>(); // `${slug}/${ident}` -> ids
+
+export interface PlaneProject {
+  id: string;
+  identifier: string; // 例如 "CSDK"
+  name: string;
+}
+
+export interface PlaneIssue {
+  id: string;
+  name: string;
+  description_stripped?: string;
+  description_html?: string;
+  sequence_id: number;
+  state?: string;
+  state_detail?: { name: string; group: string };
+  labels?: string[];
+  label_details?: { name: string; color: string }[];
+  priority?: string;
+  assignee_details?: { display_name: string }[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PlaneComment {
+  id: string;
+  comment_stripped?: string;
+  comment_html?: string;
+  actor_detail?: { display_name: string };
+  created_at?: string;
+}
+
+export interface AnalyzableIssue {
+  workspaceSlug: string;
+  identifier: string; // 例如 "CSDK-2"
+  url: string;
+  title: string;
+  description: string;
+  state: string;
+  priority: string;
+  labels: string[];
+  assignees: string[];
+  comments: { author: string; text: string; createdAt?: string }[];
+}
+
+function assertToken() {
+  if (!getToken()) {
+    throw new Error("缺少 PLANE_API_TOKEN，请在 server/.env 中配置");
+  }
+}
+
+async function planeFetch<T>(path: string): Promise<T> {
+  assertToken();
+  const res = await fetch(`${getBase()}${path}`, {
+    headers: {
+      "X-API-Key": getToken(),
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Plane API ${res.status} ${res.statusText}: ${path}\n${body}`);
+  }
+  return (await res.json()) as T;
+}
+
+// 列出工作区所有项目，结果带缓存
+async function listProjects(workspaceSlug: string): Promise<PlaneProject[]> {
+  const cached = projectCache.get(workspaceSlug);
+  if (cached) return cached;
+  const data = await planeFetch<PlaneProject[] | { results: PlaneProject[] }>(
+    `/api/v1/workspaces/${workspaceSlug}/projects/`
+  );
+  const list = Array.isArray(data) ? data : data.results;
+  projectCache.set(workspaceSlug, list);
+  return list;
+}
+
+// 通过项目 identifier 找到 project_id
+async function findProjectByIdentifier(workspaceSlug: string, projectIdent: string) {
+  const projects = await listProjects(workspaceSlug);
+  const match = projects.find(
+    (p) => p.identifier.toLowerCase() === projectIdent.toLowerCase()
+  );
+  if (!match) {
+    throw new Error(
+      `未在 workspace ${workspaceSlug} 中找到 identifier=${projectIdent} 的项目`
+    );
+  }
+  return match;
+}
+
+// 通过 sequence_id 找到 issue_id（Plane 一些版本支持 ?sequence_id=xx 过滤）
+async function findIssueIdBySequence(
+  workspaceSlug: string,
+  projectId: string,
+  sequenceId: number
+): Promise<string> {
+  // 先尝试带过滤的 list
+  try {
+    const data = await planeFetch<PlaneIssue[] | { results: PlaneIssue[] }>(
+      `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/?sequence_id=${sequenceId}`
+    );
+    const list = Array.isArray(data) ? data : data.results;
+    const hit = list.find((i) => i.sequence_id === sequenceId);
+    if (hit) return hit.id;
+  } catch {
+    // 忽略，走兜底
+  }
+  // 兜底：分页拉取（仅用于小项目；如需大项目需要分页 while）
+  const data = await planeFetch<PlaneIssue[] | { results: PlaneIssue[] }>(
+    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/`
+  );
+  const list = Array.isArray(data) ? data : data.results;
+  const hit = list.find((i) => i.sequence_id === sequenceId);
+  if (!hit) {
+    throw new Error(`未找到 sequence_id=${sequenceId} 的 issue`);
+  }
+  return hit.id;
+}
+
+// 解析 "CSDK-2" -> { projectId, issueId }，带缓存
+export async function resolveIssueIds(
+  workspaceSlug: string,
+  identifier: string
+): Promise<{ projectId: string; issueId: string; project: PlaneProject; sequenceId: number }> {
+  const m = identifier.match(/^([A-Za-z0-9]+)-(\d+)$/);
+  if (!m) {
+    throw new Error(`非法 identifier: ${identifier}（期望形如 CSDK-2）`);
+  }
+  const projectIdent = m[1];
+  const sequenceId = Number(m[2]);
+
+  const cacheKey = `${workspaceSlug}/${identifier.toUpperCase()}`;
+  const cached = issueIdCache.get(cacheKey);
+  const project = await findProjectByIdentifier(workspaceSlug, projectIdent);
+  if (cached) {
+    return { ...cached, project, sequenceId };
+  }
+
+  const issueId = await findIssueIdBySequence(workspaceSlug, project.id, sequenceId);
+  const ids = { projectId: project.id, issueId };
+  issueIdCache.set(cacheKey, ids);
+  return { ...ids, project, sequenceId };
+}
+
+export async function getIssueDetail(
+  workspaceSlug: string,
+  projectId: string,
+  issueId: string
+): Promise<PlaneIssue> {
+  return planeFetch<PlaneIssue>(
+    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/${issueId}/`
+  );
+}
+
+export async function listIssueComments(
+  workspaceSlug: string,
+  projectId: string,
+  issueId: string
+): Promise<PlaneComment[]> {
+  try {
+    const data = await planeFetch<PlaneComment[] | { results: PlaneComment[] }>(
+      `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/${issueId}/comments/`
+    );
+    return Array.isArray(data) ? data : data.results;
+  } catch {
+    return [];
+  }
+}
+
+// 把以上三步聚合，输出便于喂给 Claude 的结构
+export async function fetchAnalyzableIssue(
+  workspaceSlug: string,
+  identifier: string
+): Promise<AnalyzableIssue> {
+  const { projectId, issueId, project, sequenceId } = await resolveIssueIds(
+    workspaceSlug,
+    identifier
+  );
+  const [issue, comments] = await Promise.all([
+    getIssueDetail(workspaceSlug, projectId, issueId),
+    listIssueComments(workspaceSlug, projectId, issueId),
+  ]);
+  return {
+    workspaceSlug,
+    identifier: `${project.identifier}-${sequenceId}`,
+    url: `https://app.plane.so/${workspaceSlug}/browse/${project.identifier}-${sequenceId}/`,
+    title: issue.name,
+    description: issue.description_stripped ?? "",
+    state: issue.state_detail?.name ?? issue.state ?? "",
+    priority: issue.priority ?? "",
+    labels: (issue.label_details ?? []).map((l) => l.name),
+    assignees: (issue.assignee_details ?? []).map((a) => a.display_name),
+    comments: comments.map((c) => ({
+      author: c.actor_detail?.display_name ?? "unknown",
+      text: c.comment_stripped ?? "",
+      createdAt: c.created_at,
+    })),
+  };
+}
