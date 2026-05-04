@@ -24,9 +24,15 @@ const issueTitleEl = $("issueTitle");
 const issueStateEl = $("issueState");
 const issueLabelsEl = $("issueLabels");
 const issueLinkEl = $("issueLink");
+const writebackEl = $("writeback");
+const writebackTextEl = $("writebackText");
+const btnUpdateDesc = $("btnUpdateDesc");
+const btnPostComment = $("btnPostComment");
+const writebackStatusEl = $("writebackStatus");
 
 let currentParsed = null; // { workspaceSlug, issueIdentifier }
 let abortCtrl = null;
+let analysisText = ""; // 累积的 Claude 分析正文
 
 // 持久化后端地址
 chrome.storage?.local.get(["serverUrl"]).then((s) => {
@@ -147,6 +153,11 @@ function resetOutput() {
   stepByToolId.clear();
   startTs = Date.now();
   issueCard.classList.add("hidden");
+  writebackEl.classList.add("hidden");
+  writebackTextEl.value = "";
+  writebackStatusEl.textContent = "";
+  writebackStatusEl.className = "writeback-status";
+  analysisText = "";
 }
 
 async function startAnalyze() {
@@ -254,8 +265,9 @@ function handleEvent(ev) {
       addStep({ kind: "think", badge: "思考", title: truncate(ev.text), body: ev.text });
       break;
     case "text":
-      // 分析正文写入「分析结果」面板；同时在过程中记录一条摘要
+      // 分析正文写入「分析结果」面板；同时累积用于回写
       appendText(ev.text);
+      analysisText += ev.text;
       addStep({ kind: "text", badge: "回答", title: truncate(ev.text, 80), body: ev.text });
       break;
     case "tool_use": {
@@ -318,6 +330,11 @@ function handleEvent(ev) {
       if (ev.costUsd != null) parts.push(`$${ev.costUsd.toFixed(4)}`);
       setStatus(`完成（${parts.join(", ")}）`);
       addStep({ kind: "done", badge: "完成", title: parts.join(" · ") });
+      // 打开回写区
+      if (analysisText.trim()) {
+        writebackTextEl.value = analysisText.trim();
+        writebackEl.classList.remove("hidden");
+      }
       break;
     }
     case "end":
@@ -339,3 +356,76 @@ document.querySelectorAll(".tabs .tab").forEach((btn) => {
 
 analyzeBtn.addEventListener("click", startAnalyze);
 stopBtn.addEventListener("click", () => abortCtrl?.abort());
+
+// === 回写：摘要生成（客户端简单实现）===
+function summarizeForComment(fullText, maxChars = 300) {
+  if (!fullText) return "";
+  // 1) 优先取第一个非标题段落
+  const blocks = fullText
+    .split(/\n{2,}/)
+    .map((s) => s.trim())
+    .filter((s) => s && !s.startsWith("#"));
+  let head = blocks[0] || fullText.trim();
+  // 2) 去掉 Markdown 列表/粗体符号，单行化
+  head = head
+    .replace(/^[-*]\s+/gm, "• ")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
+  const oneLine = head.replace(/\s+/g, " ").trim();
+  return oneLine.length > maxChars ? oneLine.slice(0, maxChars) + "…" : oneLine;
+}
+
+async function postWriteback(path, content) {
+  const serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
+  if (!serverUrl || !currentParsed) throw new Error("后端地址或 issue 未就绪");
+  const res = await fetch(`${serverUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...currentParsed, content }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+}
+
+function setWriteStatus(msg, kind = "") {
+  writebackStatusEl.textContent = msg;
+  writebackStatusEl.className = "writeback-status" + (kind ? " " + kind : "");
+}
+
+btnUpdateDesc.addEventListener("click", async () => {
+  const text = writebackTextEl.value.trim();
+  if (!text) return setWriteStatus("内容为空", "error");
+  btnUpdateDesc.disabled = true;
+  btnPostComment.disabled = true;
+  setWriteStatus("正在更新 issue 描述…");
+  try {
+    await postWriteback("/plane/description", text);
+    setWriteStatus("✓ 描述已更新，刷新 Plane 可见", "success");
+  } catch (err) {
+    setWriteStatus(`更新失败：${err.message}`, "error");
+  } finally {
+    btnUpdateDesc.disabled = false;
+    btnPostComment.disabled = false;
+  }
+});
+
+btnPostComment.addEventListener("click", async () => {
+  const text = writebackTextEl.value.trim();
+  if (!text) return setWriteStatus("内容为空", "error");
+  const summary = summarizeForComment(text);
+  const content = `【AI 分析摘要】\n${summary}`;
+  btnUpdateDesc.disabled = true;
+  btnPostComment.disabled = true;
+  setWriteStatus(`正在发布评论（${summary.length} 字）…`);
+  try {
+    await postWriteback("/plane/comment", content);
+    setWriteStatus("✓ 评论已发布，刷新 Plane 可见", "success");
+  } catch (err) {
+    setWriteStatus(`发布失败：${err.message}`, "error");
+  } finally {
+    btnUpdateDesc.disabled = false;
+    btnPostComment.disabled = false;
+  }
+});

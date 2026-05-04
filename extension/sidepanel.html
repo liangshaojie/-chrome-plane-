@@ -42,6 +42,21 @@
   <main id="process" class="pane pane-process active"></main>
   <main id="output" class="pane pane-result"></main>
 
+  <!-- 分析完成后出现的回写区 -->
+  <section id="writeback" class="writeback hidden">
+    <div class="writeback-head">写回 Plane</div>
+    <textarea id="writebackText" rows="6" placeholder="完整分析文本（可编辑）"></textarea>
+    <div class="writeback-actions">
+      <button id="btnUpdateDesc" class="btn-primary" title="用上方完整内容覆盖 issue 描述">
+        覆盖描述（详细）
+      </button>
+      <button id="btnPostComment" title="自动摘要后作为一条评论发布">
+        发布评论（摘要）
+      </button>
+    </div>
+    <div id="writebackStatus" class="writeback-status"></div>
+  </section>
+
   <script src="sidepanel.js"></script>
 </body>
 

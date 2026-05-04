@@ -60,19 +60,34 @@ function assertToken() {
   }
 }
 
-async function planeFetch<T>(path: string): Promise<T> {
+async function planeFetch<T>(
+  path: string,
+  init?: { method?: string; body?: unknown }
+): Promise<T> {
   assertToken();
+  const method = init?.method ?? "GET";
   const res = await fetch(`${getBase()}${path}`, {
+    method,
     headers: {
       "X-API-Key": getToken(),
       "Content-Type": "application/json",
     },
+    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Plane API ${res.status} ${res.statusText}: ${path}\n${body}`);
+    throw new Error(
+      `Plane API ${method} ${res.status} ${res.statusText}: ${path}\n${body}`
+    );
   }
-  return (await res.json()) as T;
+  // 某些 PATCH/POST 可能返回空
+  const text = await res.text();
+  if (!text) return undefined as unknown as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as unknown as T;
+  }
 }
 
 // 列出工作区所有项目，结果带缓存
@@ -209,4 +224,54 @@ export async function fetchAnalyzableIssue(
       createdAt: c.created_at,
     })),
   };
+}
+
+// 把 Markdown 简单转 HTML：Plane 的 description_html / comment_html 接受 HTML。
+// 这里只做最小实现：把换行转 <br>、代码块/列表保持原文包在 <pre>/<p> 里。
+function markdownToHtml(md: string): string {
+  // 非常简化：按段落切分；段落内换行转 <br>；已有 HTML 标记则原样保留
+  const escaped = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const blocks = escaped.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+  return blocks.map((b) => `<p>${b.replace(/\n/g, "<br/>")}</p>`).join("\n");
+}
+
+// 更新 issue 描述（支持 markdown / html）
+export async function updateIssueDescription(
+  workspaceSlug: string,
+  identifier: string,
+  markdown: string
+): Promise<void> {
+  const { projectId, issueId } = await resolveIssueIds(workspaceSlug, identifier);
+  await planeFetch(
+    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/${issueId}/`,
+    {
+      method: "PATCH",
+      body: {
+        description_html: markdownToHtml(markdown),
+        description_stripped: markdown,
+      },
+    }
+  );
+}
+
+// 新增一条评论
+export async function createIssueComment(
+  workspaceSlug: string,
+  identifier: string,
+  markdown: string
+): Promise<void> {
+  const { projectId, issueId } = await resolveIssueIds(workspaceSlug, identifier);
+  await planeFetch(
+    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/${issueId}/comments/`,
+    {
+      method: "POST",
+      body: {
+        comment_html: markdownToHtml(markdown),
+        comment_stripped: markdown,
+      },
+    }
+  );
 }

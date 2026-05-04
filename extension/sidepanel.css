@@ -234,3 +234,71 @@ body {
   color: #9ca3af;
   font-size: 10px;
 }
+
+/* 回写 Plane 区域 */
+.writeback {
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 14px;
+  background: #fafafa;
+}
+.writeback.hidden {
+  display: none;
+}
+.writeback-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+.writeback textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  resize: vertical;
+  background: #fff;
+}
+.writeback-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.writeback-actions button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.writeback-actions button:hover {
+  background: #f3f4f6;
+}
+.writeback-actions button.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+.writeback-actions button.btn-primary:hover {
+  background: #1d4ed8;
+}
+.writeback-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.writeback-status {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  min-height: 16px;
+}
+.writeback-status.error {
+  color: #b91c1c;
+}
+.writeback-status.success {
+  color: #15803d;
+}

@@ -6,6 +6,7 @@ import "./env.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { registerAnalyzeRoute } from "./routes/analyze.js";
+import { registerWriteRoutes } from "./routes/write.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -26,6 +27,7 @@ app.get("/health", async () => ({
 }));
 
 await registerAnalyzeRoute(app);
+await registerWriteRoutes(app);
 
 const port = Number(process.env.PORT ?? 8787);
 app
