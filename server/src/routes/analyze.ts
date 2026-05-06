@@ -11,6 +11,10 @@ const Body = z.object({
   issueIdentifier: z.string().regex(/^[A-Za-z0-9]+-\d+$/),
 });
 
+/**
+ * 注册分析路由
+ * @param app 
+ */
 export async function registerAnalyzeRoute(app: FastifyInstance) {
   app.post("/analyze", async (req, reply) => {
     const parse = Body.safeParse(req.body);

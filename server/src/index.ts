@@ -16,6 +16,9 @@ await app.register(cors, {
   methods: ["GET", "POST", "OPTIONS"],
 });
 
+/**
+ * 健康检查接口
+ */
 app.get("/health", async () => ({
   ok: true,
   hasPlaneToken: Boolean(process.env.PLANE_API_TOKEN),
@@ -26,9 +29,15 @@ app.get("/health", async () => ({
   localCodeRoot: process.env.LOCAL_CODE_ROOT ?? null,
 }));
 
+/**
+ * 注册路由
+ */
 await registerAnalyzeRoute(app);
 await registerWriteRoutes(app);
 
+/**
+ * 启动服务器
+ */
 const port = Number(process.env.PORT ?? 8787);
 app
   .listen({ host: "127.0.0.1", port })
