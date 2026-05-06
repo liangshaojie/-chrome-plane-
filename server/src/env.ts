@@ -3,3 +3,8 @@
 // override:true 让 .env 优先级高于 shell 里已导出的同名变量。
 import dotenv from "dotenv";
 dotenv.config({ override: true });
+
+export const ENABLE_SKILLS = process.env.ENABLE_SKILLS === "true";
+export const SKILL_TOOL_ROOTS = (process.env.SKILL_TOOL_ROOTS || "~/.claude/skills")
+  .split(",")
+  .map((p) => p.trim());

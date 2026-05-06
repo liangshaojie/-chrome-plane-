@@ -2,6 +2,7 @@
 // 通过 query() 流式产出分析结果。
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { AnalyzableIssue } from "./plane.js";
+import { ENABLE_SKILLS, SKILL_TOOL_ROOTS } from "./env.js";
 
 export type AgentEvent =
   | { type: "system"; subtype?: string; model?: string; sessionId?: string; cwd?: string; tools?: string[] }
@@ -28,6 +29,10 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     ? `\n\n本地代码仓库路径：${codeRoot}\n你可以使用 Read / Glob / Grep 工具在此仓库内查找相关实现，引用具体文件路径与代码片段。`
     : "\n\n（当前未配置本地代码仓库，仅做静态分析。）";
 
+  const skillHint = ENABLE_SKILLS
+    ? `\n\n你可以使用 /skill-name 调用技能来扩展能力，例如 /xiangyu-plane-project:create-task 创建 Plane 子任务。\n可用技能来源：${SKILL_TOOL_ROOTS.join("、")}`
+    : "";
+
   return [
     "你是一位资深前端架构师，请分析下面这条来自 Plane 的工作项。",
     "请先判断它属于【Bug】还是【需求】，再给出分析：",
@@ -44,7 +49,9 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     "- 风险点与注意事项",
     "",
     "请用 Markdown 输出，结构清晰、要点突出，使用中文。",
+    "如果分析过程中需要创建子任务或操作 Plane 项目，可直接使用 /xiangyu-plane-project:create-task 等命令。",
     codeHint,
+    skillHint,
     "",
     "================ Plane WorkItem ================",
     `[标识] ${issue.identifier}`,
@@ -71,27 +78,25 @@ export async function* analyzeIssue(
   const codeRoot = process.env.LOCAL_CODE_ROOT;
   const prompt = buildPrompt(issue, codeRoot);
 
-  // 仅在配置了本地仓库时才允许文件读取工具，避免误读到当前 server 目录
-  const allowedTools = codeRoot ? ["Read", "Glob", "Grep"] : [];
+  // 基础工具 + 可选的文件操作工具
+  const baseTools = ["Skill", "Read", "Glob", "Grep", "Write", "Bash"];
+  const fileTools = codeRoot ? ["Read", "Glob", "Grep"] : [];
+  const allowedTools = [...baseTools, ...fileTools];
 
-  // === 调试日志 ===
   console.log("\n========== [agent] analyzeIssue start ==========");
+  console.log("[agent] ENABLE_SKILLS =", ENABLE_SKILLS);
+  console.log("[agent] SKILL_TOOL_ROOTS =", SKILL_TOOL_ROOTS);
   console.log("[agent] env.ANTHROPIC_BASE_URL =", process.env.ANTHROPIC_BASE_URL);
   console.log("[agent] env.ANTHROPIC_MODEL    =", process.env.ANTHROPIC_MODEL);
-  console.log("[agent] env.ANTHROPIC_AUTH_TOKEN present =", Boolean(process.env.ANTHROPIC_AUTH_TOKEN));
-  console.log("[agent] env.ANTHROPIC_API_KEY present    =", Boolean(process.env.ANTHROPIC_API_KEY));
   console.log("[agent] codeRoot =", codeRoot);
   console.log("[agent] allowedTools =", allowedTools);
   console.log("[agent] prompt length =", prompt.length);
-  console.log("[agent] prompt preview:\n---\n" + prompt.slice(0, 400) + "\n---");
 
   let msgCount = 0;
   const t0 = Date.now();
 
   try {
-    // 显式从 env 读取模型名，方便走 MiniMax / 其它 Anthropic 兼容网关
     const model = process.env.ANTHROPIC_MODEL;
-    console.log("[agent] query options.model =", model);
 
     for await (const msg of query({
       prompt,
@@ -99,20 +104,20 @@ export async function* analyzeIssue(
         ...(codeRoot ? { cwd: codeRoot } : {}),
         ...(model ? { model } : {}),
         allowedTools,
+        settingSources: ENABLE_SKILLS ? ["user", "project"] : [],
         permissionMode: "acceptEdits",
-        maxTurns: 8,
+        maxTurns: 20,
       },
     })) {
       msgCount++;
       const m: any = msg;
-      // 打印原始 SDK 消息：对 assistant 内容也逐块打印，便于定位
+
       try {
         const brief = {
           n: msgCount,
           dt: Date.now() - t0,
           type: m.type,
           subtype: m.subtype,
-          is_error: m.is_error,
           contentBlocks: Array.isArray(m?.message?.content)
             ? m.message.content.map((b: any) => ({
                 type: b?.type,
@@ -121,12 +126,10 @@ export async function* analyzeIssue(
               }))
             : undefined,
           usage: m?.message?.usage,
-          session_id: m?.session_id,
-          model: m?.model,
         };
         console.log("[agent] raw msg:", JSON.stringify(brief));
-      } catch (e) {
-        console.log("[agent] raw msg (stringify failed):", m?.type, e);
+      } catch (_e) {
+        console.log("[agent] raw msg:", m?.type);
       }
 
       if (signal?.aborted) {
@@ -135,7 +138,6 @@ export async function* analyzeIssue(
       }
 
       if (m.type === "system") {
-        // SDK 初始化事件：包含 model、session_id、cwd、可用工具等
         yield {
           type: "system",
           subtype: m.subtype,
@@ -152,10 +154,15 @@ export async function* analyzeIssue(
           } else if (block.type === "thinking" && "thinking" in block) {
             yield { type: "thinking", text: String(block.thinking) };
           } else if (block.type === "tool_use") {
+            const toolName = String(block.name ?? "");
+            const toolInput = block.input as any;
+            if (toolName === "Skill") {
+              console.log(`[agent] 🔧 使用技能: ${toolInput?.skill}`);
+            }
             yield {
               type: "tool_use",
               id: String(block.id ?? ""),
-              name: String(block.name ?? ""),
+              name: toolName,
               input: block.input,
             };
           }
@@ -169,7 +176,6 @@ export async function* analyzeIssue(
           };
         }
       } else if (m.type === "user" && m.message?.content) {
-        // 工具执行结果会作为 user 消息回传（tool_result block）
         for (const block of m.message.content as any[]) {
           if (!block || typeof block !== "object") continue;
           if (block.type === "tool_result") {
@@ -192,7 +198,6 @@ export async function* analyzeIssue(
           }
         }
       } else if (m.type === "result") {
-        // 如果 SDK 以错误终止（例如鉴权失败、max_turns），把错误信息抛出来
         const subtype = String(m.subtype ?? "ok");
         if (m.is_error || subtype.startsWith("error")) {
           const detail =
@@ -213,9 +218,7 @@ export async function* analyzeIssue(
         };
       }
     }
-    console.log(
-      `[agent] loop finished: msgs=${msgCount} dt=${Date.now() - t0}ms`
-    );
+    console.log(`[agent] loop finished: msgs=${msgCount} dt=${Date.now() - t0}ms`);
   } catch (err: any) {
     console.error("[agent] query threw:", err);
     yield { type: "error", message: err?.message ?? String(err) };
