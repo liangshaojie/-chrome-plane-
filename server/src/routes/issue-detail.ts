@@ -20,6 +20,15 @@ export async function registerIssueDetailRoute(app: FastifyInstance) {
 
     try {
       const result = await fetchIssueDetail(workspaceSlug, issueIdentifier);
+      req.log.info(
+        {
+          identifier: issueIdentifier,
+          htmlLen: result.description_html?.length ?? 0,
+          htmlPreview: result.description_html?.slice(0, 300),
+          imageAssetUrls: result.imageAssetUrls,
+        },
+        "issue-detail extracted"
+      );
       return { ok: true, ...result };
     } catch (err: any) {
       req.log.error({ err }, "fetchIssueDetail failed");

@@ -7,17 +7,48 @@ export interface ParsedPlaneUrl {
   issueIdentifier: string
 }
 
-async function fetchImageAsBase64(url: string, serverUrl: string): Promise<{ base64: string; mimeType: string } | null> {
-  try {
-    const proxyUrl = `${serverUrl.replace(/\/$/, '')}/proxy-image?url=${encodeURIComponent(url)}`
-    const res = await fetch(proxyUrl)
-    if (!res.ok) return null
-    const data = await res.json() as { ok: boolean; base64?: string; mimeType?: string; error?: string }
-    if (!data.ok || !data.base64) return null
-    return { base64: data.base64, mimeType: data.mimeType ?? 'image/png' }
-  } catch {
-    return null
-  }
+/**
+ * 通过 content script 下载图片
+ * 用户使用的是官方 Plane（app.plane.so），asset URL 鉴权依赖 plane.so 页面的 session cookie，
+ * 所以必须从 content script 里发起 fetch（带 credentials:'include'）。
+ */
+async function downloadImagesViaContentScript(
+  urls: string[]
+): Promise<{ url: string; base64: string; mimeType: string }[]> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id
+      if (!tabId) {
+        console.warn('[useSSE] 未找到当前 tab')
+        resolve([])
+        return
+      }
+      const timeout = setTimeout(() => {
+        console.warn('[useSSE] content script 下载超时（30s）')
+        resolve([])
+      }, 30000)
+      try {
+        chrome.tabs.sendMessage(tabId, { type: 'downloadImages', urls }, (resp) => {
+          clearTimeout(timeout)
+          const lastErr = chrome.runtime.lastError
+          if (lastErr) {
+            console.warn('[useSSE] sendMessage 失败：', lastErr.message, '——请刷新一下 plane.so 页面让 content script 重新注入')
+            resolve([])
+            return
+          }
+          console.log('[useSSE] content script 响应：', {
+            requested: urls.length,
+            received: resp?.results?.length ?? 0,
+          })
+          resolve(resp?.results ?? [])
+        })
+      } catch (e) {
+        clearTimeout(timeout)
+        console.error('[useSSE] sendMessage 异常：', e)
+        resolve([])
+      }
+    })
+  })
 }
 
 export function useSSE() {
@@ -51,16 +82,17 @@ export function useSSE() {
       if (!detailRes.ok) throw new Error(`issue-detail 失败 ${detailRes.status}`)
       const { imageAssetUrls } = await detailRes.json().catch(() => ({ imageAssetUrls: [] as string[] }))
 
-      // Step 2: 前端下载图片（带 Cookie）- 转换 asset URL 为 base64
+      // Step 2: 通过 content script 下载图片（它运行在 plane.so 页面，有页面 session cookie）
       const images: { url: string; base64: string; mimeType: string }[] = []
       if (imageAssetUrls?.length) {
         analysisStore.setStatus(`下载图片中…（0/${imageAssetUrls.length}）`)
-        for (let i = 0; i < imageAssetUrls.length; i++) {
+        const results = await downloadImagesViaContentScript(imageAssetUrls)
+        for (let i = 0; i < results.length; i++) {
           analysisStore.setStatus(`下载图片中…（${i + 1}/${imageAssetUrls.length}）`)
-          const result = await fetchImageAsBase64(imageAssetUrls[i], url)
-          if (result) {
-            images.push({ url: imageAssetUrls[i], ...result })
-          }
+          images.push(results[i])
+        }
+        if (images.length === 0) {
+          analysisStore.setStatus(`下载图片失败，跳过`)
         }
       }
 

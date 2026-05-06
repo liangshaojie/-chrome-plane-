@@ -3,15 +3,22 @@
   "name": "Plane WorkItem Analyzer",
   "version": "0.1.0",
   "description": "用 Claude Agent SDK 分析 Plane 工作项（Bug / 需求）",
-  "permissions": ["sidePanel", "activeTab", "tabs", "storage"],
+  "permissions": ["sidePanel", "activeTab", "tabs", "storage", "cookies"],
   "host_permissions": [
-    "https://app.plane.so/*",
+    "https://*.plane.so/*",
     "http://127.0.0.1:8787/*",
     "http://localhost:8787/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://*.plane.so/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "side_panel": {
     "default_path": "sidepanel.html"
   },

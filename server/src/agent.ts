@@ -33,14 +33,22 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     ? `\n\n你可以使用 /skill-name 调用技能来扩展能力，例如 /xiangyu-plane-project:create-task 创建 Plane 子任务。\n可用技能来源：${SKILL_TOOL_ROOTS.join("、")}`
     : "";
 
+  // 图片处理策略：服务端已把图片落盘到本地绝对路径，这里把路径列出给 Claude，
+  // 由 Claude 主动调用已配置的 MCP 图像理解工具（例如 minimax 的 image understanding MCP）来分析。
+  // 不再走多模态 content block —— 我们用的网关（如 MiniMax-Anthropic 兼容协议）不一定支持 vision。
+  const imagePaths = issue.imageFilePaths ?? [];
   const imageHint =
-    issue.images && issue.images.length > 0
-      ? `\n\n【工作项描述中的图片】（共 ${issue.images.length} 张）\n${issue.images
-          .map(
-            (img, i) =>
-              `![图片${i + 1}](data:${img.mimeType};base64,${img.base64})`
-          )
-          .join("\n")}`
+    imagePaths.length > 0
+      ? [
+          "",
+          `【工作项描述中的图片】共 ${imagePaths.length} 张，已下载到本地，绝对路径如下：`,
+          ...imagePaths.map((p, i) => `  ${i + 1}. ${p}`),
+          "",
+          "⚠️ 重要：请**优先调用已配置的 MCP 图像理解工具**（例如 minimax 提供的 image understanding / understand_image 等 MCP 工具）来分析这些图片，",
+          "把图片中的关键信息（界面截图、报错堆栈、流程图、设计稿等）作为分析依据。",
+          "如果没有可用的 MCP 图像工具，再退化为通过 Read 工具读取这些文件元信息。",
+          "请在最终分析里明确说明你识别到的图片内容。",
+        ].join("\n")
       : "";
 
   return [
@@ -110,14 +118,16 @@ export async function* analyzeIssue(
   try {
     const model = process.env.ANTHROPIC_MODEL;
 
+    // 让 Claude Code 自由调用所有 user/project 设置中的 MCP 工具（包含 minimax 图像理解 MCP）
+    // 因此这里不再硬限制 allowedTools，并把 permissionMode 设为 bypassPermissions 以避免 MCP 工具被权限弹窗拦截。
     for await (const msg of query({
       prompt,
       options: {
         ...(codeRoot ? { cwd: codeRoot } : {}),
         ...(model ? { model } : {}),
-        allowedTools,
-        settingSources: ENABLE_SKILLS ? ["user", "project"] : [],
-        permissionMode: "acceptEdits",
+        settingSources: ["user", "project"],
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
         maxTurns: 20,
       },
     })) {

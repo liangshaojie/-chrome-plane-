@@ -53,6 +53,8 @@ export interface AnalyzableIssue {
   assignees: string[];
   comments: { author: string; text: string; createdAt?: string }[];
   images?: { url: string; base64: string; mimeType: string }[];
+  // 图片落盘后的本地绝对路径，供 Claude 通过 MCP / Read 工具使用
+  imageFilePaths?: string[];
 }
 
 function assertToken() {
@@ -196,23 +198,45 @@ export async function listIssueComments(
   }
 }
 
-// 从 description_html 中提取所有图片的 asset URL（支持 <img> 和 <image-component> 两种标签）
-// image-component 的 src 是 Plane 文件 ID，需要拼成完整 asset URL
+// 从 description_html 中提取所有图片的 asset URL
+// 支持的几种 Plane 富文本图片标记：
+//   1) <img src="https://..."> 直接 URL
+//   2) <image-component src="<assetId>"> 仅 assetId（需拼接 asset URL）
+//   3) <image src="<assetId 或 URL>"> 自定义元素的另一种命名
+//   4) 任意标签里出现 src="<assetId>"，且 assetId 是 UUID 形式
 export function extractImageAssetUrls(html: string, workspaceSlug: string, projectId: string): string[] {
-  const urls: string[] = [];
-  // <img src="...">
-  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-  let m;
-  while ((m = imgRegex.exec(html)) !== null) {
-    urls.push(m[1]);
-  }
-  // <image-component src="..."> -> 拼成 Plane asset URL
+  const urls = new Set<string>();
   const assetBase = `https://api.plane.so/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}`;
-  const compRegex = /<image-component[^>]+src=["']([^"']+)["'][^>]*>/gi;
-  while ((m = compRegex.exec(html)) !== null) {
-    urls.push(`${assetBase}/${m[1]}/?disposition=inline`);
+  const uuidRe = /^[0-9a-fA-F-]{32,40}$/; // 粗略 uuid 判定
+
+  const pushSrc = (raw: string) => {
+    if (!raw) return;
+    // 已经是绝对 URL：原样使用
+    if (/^https?:\/\//i.test(raw)) {
+      urls.add(raw);
+      return;
+    }
+    // 形如 UUID 的 assetId：拼成 Plane asset URL
+    if (uuidRe.test(raw.trim())) {
+      urls.add(`${assetBase}/${raw.trim()}/?disposition=inline`);
+      return;
+    }
+    // 退化处理：以 / 开头的相对路径，拼到 plane.so 根域
+    if (raw.startsWith("/")) {
+      urls.add(`https://api.plane.so${raw}`);
+      return;
+    }
+  };
+
+  // 通用：抓取所有 <xxx ... src="..."> 标签的 src
+  // 仅在标签名形如 img / image / image-component / picture 等才认为是图片
+  const tagRe = /<\s*(img|image|image-component|picture)\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = tagRe.exec(html)) !== null) {
+    pushSrc(m[2]);
   }
-  return urls;
+
+  return Array.from(urls);
 }
 
 // 返回 issue 详情（含 description_html 和图片 asset URL），供前端下载图片
