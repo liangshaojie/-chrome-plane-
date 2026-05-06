@@ -8,13 +8,19 @@ const activeTab = defineModel<string>({ default: 'process' })
       :class="['tab', activeTab === 'process' && 'active']"
       @click="activeTab = 'process'"
     >
-      过程日志
+      过程分析
     </button>
     <button
       :class="['tab', activeTab === 'result' && 'active']"
       @click="activeTab = 'result'"
     >
       分析结果
+    </button>
+    <button
+      :class="['tab', activeTab === 'proposal' && 'active']"
+      @click="activeTab = 'proposal'"
+    >
+      修改方案
     </button>
   </nav>
 </template>
