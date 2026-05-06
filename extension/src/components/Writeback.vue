@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { NInput, NButton, NText, NSpace } from 'naive-ui'
+import { ref } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlaneUrl } from '@/composables/usePlaneUrl'
-import { ref } from 'vue'
 
 const analysisStore = useAnalysisStore()
 const settingsStore = useSettingsStore()
@@ -72,45 +71,53 @@ async function postComment() {
 
 <template>
   <div v-if="analysisStore.showWriteback" class="writeback">
-    <NInput
-      v-model:value="analysisStore.writebackText"
-      type="textarea"
-      :autosize="{ minRows: 4, maxRows: 10 }"
+    <textarea
+      v-model="analysisStore.writebackText"
+      class="textarea"
       placeholder="分析结果将在此显示"
+      rows="4"
     />
-    <NSpace style="margin-top: 8px">
-      <NButton type="primary" size="small" :loading="loading" @click="updateDescription">
-        覆盖描述
-      </NButton>
-      <NButton size="small" :loading="loading" @click="postComment">
-        发布评论
-      </NButton>
-    </NSpace>
-    <NText
+    <div class="writeback-actions">
+      <button
+        class="btn btn-primary"
+        :disabled="loading"
+        @click="updateDescription"
+      >覆盖描述</button>
+      <button
+        class="btn btn-secondary"
+        :disabled="loading"
+        @click="postComment"
+      >发布评论</button>
+    </div>
+    <div
       v-if="analysisStore.writebackStatus"
-      depth="3"
-      class="writeback-status"
-      :class="analysisStore.writebackStatusKind"
+      :class="['writeback-status', analysisStore.writebackStatusKind]"
     >
       {{ analysisStore.writebackStatus }}
-    </NText>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .writeback {
   padding: 12px 16px;
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.writeback-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 .writeback-status {
-  display: block;
   margin-top: 6px;
   font-size: 12px;
+  color: var(--text-muted);
 }
 .writeback-status.success {
-  color: #16a34a;
+  color: var(--success);
 }
 .writeback-status.error {
-  color: #dc2626;
+  color: var(--error);
 }
 </style>

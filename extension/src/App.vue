@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NConfigProvider, NMessageProvider, NScrollbar } from 'naive-ui'
 import { ref, onMounted } from 'vue'
 import TopBar from '@/components/TopBar.vue'
 import Controls from '@/components/Controls.vue'
@@ -17,53 +16,22 @@ const activeTab = ref('process')
 onMounted(() => {
   settingsStore.loadFromStorage()
 })
-
-const themeOverrides = {
-  common: {
-    borderRadius: '6px',
-    fontSize: '13px',
-    primaryColor: '#2563eb',
-  },
-}
 </script>
 
 <template>
-  <NConfigProvider :theme-overrides="themeOverrides">
-    <NMessageProvider>
-      <div class="app">
-        <TopBar />
-        <Controls />
-        <IssueCard />
-        <StatusBar />
-        <TabNav v-model:active-tab="activeTab" />
-        <div class="pane-container">
-          <NScrollbar v-show="activeTab === 'process'" style="height: 100%">
-            <ProcessLog />
-          </NScrollbar>
-          <NScrollbar v-show="activeTab === 'result'" style="height: 100%">
-            <OutputPane />
-          </NScrollbar>
-        </div>
-        <Writeback />
-      </div>
-    </NMessageProvider>
-  </NConfigProvider>
+  <div class="app">
+    <TopBar />
+    <Controls />
+    <IssueCard />
+    <StatusBar />
+    <TabNav v-model="activeTab" />
+    <div class="pane-container">
+      <ProcessLog v-show="activeTab === 'process'" />
+      <OutputPane v-show="activeTab === 'result'" />
+    </div>
+    <Writeback />
+  </div>
 </template>
-
-<style>
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
-#app {
-  height: 100%;
-}
-</style>
 
 <style scoped>
 .app {
@@ -76,5 +44,7 @@ html, body {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

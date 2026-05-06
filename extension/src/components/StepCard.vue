@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { NCollapseItem, NTag, NText, NScrollbar } from 'naive-ui'
+import { ref } from 'vue'
 import type { Step, EventKind } from '@/types/events'
 
 defineProps<{ step: Step }>()
+const isOpen = ref(false)
 
-const colorMap: Record<EventKind, { color: string; textColor: string }> = {
-  sys:   { color: '#e0f2fe', textColor: '#075985' },
-  tool:  { color: '#eef2ff', textColor: '#4338ca' },
-  think: { color: '#fef3c7', textColor: '#92400e' },
-  text:  { color: '#f3f4f6', textColor: '#374151' },
-  result:{ color: '#ecfccb', textColor: '#3f6212' },
-  usage: { color: '#f3f4f6', textColor: '#6b7280' },
-  done:  { color: '#dcfce7', textColor: '#166534' },
-  err:   { color: '#fee2e2', textColor: '#b91c1c' },
+const colorMap: Record<EventKind, { bg: string; color: string }> = {
+  sys:   { bg: '#e0f2fe', color: '#075985' },
+  tool:  { bg: '#eef2ff', color: '#4338ca' },
+  think: { bg: '#fef3c7', color: '#92400e' },
+  text:  { bg: '#f3f4f6', color: '#374151' },
+  result:{ bg: '#ecfccb', color: '#3f6212' },
+  usage: { bg: '#f3f4f6', color: '#6b7280' },
+  done:  { bg: '#dcfce7', color: '#166534' },
+  err:   { bg: '#fee2e2', color: '#b91c1c' },
 }
 
 function getColor(kind: EventKind) {
@@ -21,33 +22,67 @@ function getColor(kind: EventKind) {
 </script>
 
 <template>
-  <NCollapseItem :name="step.id">
-    <template #header>
-      <NTag
-        size="tiny"
-        :color="{ color: getColor(step.kind).color, textColor: getColor(step.kind).textColor }"
-        :type="step.kind === 'err' ? 'error' : step.kind === 'done' ? 'success' : 'default'"
-        style="margin-right: 8px; flex-shrink: 0"
-      >
-        {{ step.badge }}
-      </NTag>
-      <NText depth="1" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
-        {{ step.title }}
-      </NText>
-    </template>
-    <NScrollbar v-if="step.body" style="max-height: 240px">
-      <pre class="step-body">{{ step.body }}</pre>
-    </NScrollbar>
-  </NCollapseItem>
+  <div class="step-card" :class="{ 'is-error': step.isError }">
+    <div class="step-head" @click="isOpen = !isOpen">
+      <span
+        class="tag"
+        :style="{ background: getColor(step.kind).bg, color: getColor(step.kind).color }"
+      >{{ step.badge }}</span>
+      <span class="step-title">{{ step.title }}</span>
+      <span class="step-chevron">{{ isOpen ? '▾' : '▸' }}</span>
+    </div>
+    <div v-if="isOpen && step.body" class="step-body">
+      <pre>{{ step.body }}</pre>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.step-card {
+  border-bottom: 1px solid var(--border);
+}
+.step-card:last-child {
+  border-bottom: none;
+}
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.step-head:hover {
+  background: var(--bg-secondary);
+}
+.step-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.step-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
 .step-body {
+  padding: 6px 12px 10px;
+  background: var(--bg-secondary);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.step-body pre {
   margin: 0;
   font-size: 11px;
-  font-family: monospace;
+  font-family: 'SF Mono', Consolas, monospace;
   white-space: pre-wrap;
   word-break: break-all;
   color: #374151;
+  line-height: 1.5;
+}
+.is-error .step-head {
+  background: #fef2f2;
 }
 </style>

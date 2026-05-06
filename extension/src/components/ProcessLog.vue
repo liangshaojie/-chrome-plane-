@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NCollapse, NScrollbar } from 'naive-ui'
 import StepCard from './StepCard.vue'
 import { useAnalysisStore } from '@/stores/analysis'
 
@@ -7,23 +6,25 @@ const analysisStore = useAnalysisStore()
 </script>
 
 <template>
-  <NScrollbar style="max-height: 400px">
-    <NCollapse v-if="analysisStore.steps.length">
-      <StepCard
-        v-for="step in analysisStore.steps"
-        :key="step.id"
-        :step="step"
-      />
-    </NCollapse>
-    <div v-else class="empty">暂无日志</div>
-  </NScrollbar>
+  <div class="process-log">
+    <div v-if="analysisStore.steps.length === 0" class="empty">暂无日志</div>
+    <StepCard
+      v-for="step in analysisStore.steps"
+      :key="step.id"
+      :step="step"
+    />
+  </div>
 </template>
 
 <style scoped>
+.process-log {
+  flex: 1;
+  overflow-y: auto;
+}
 .empty {
   padding: 24px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 13px;
 }
 </style>

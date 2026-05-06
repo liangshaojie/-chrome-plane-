@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NText, NProgress } from 'naive-ui'
 import { useAnalysisStore } from '@/stores/analysis'
 
 const analysisStore = useAnalysisStore()
@@ -7,20 +6,13 @@ const analysisStore = useAnalysisStore()
 
 <template>
   <div class="status-bar">
-    <NProgress
+    <div
       v-if="analysisStore.phase === 'analyzing'"
-      type="line"
-      indeterminate
-      :show-indicator="false"
-      :height="3"
+      class="progress-bar"
     />
-    <NText
-      depth="3"
-      class="status-text"
-      :class="{ error: analysisStore.phase === 'error' }"
-    >
+    <span :class="{ 'text-error': analysisStore.phase === 'error' }">
       {{ analysisStore.statusMessage || '等待分析...' }}
-    </NText>
+    </span>
   </div>
 </template>
 
@@ -28,11 +20,24 @@ const analysisStore = useAnalysisStore()
 .status-bar {
   padding: 4px 16px 6px;
   min-height: 20px;
-}
-.status-text {
+  flex-shrink: 0;
   font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.status-text.error {
-  color: #dc2626;
+.progress-bar {
+  height: 3px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary) 50%, transparent 50%);
+  background-size: 20px 100%;
+  animation: progress 1s linear infinite;
+  border-radius: 2px;
+  max-width: 100px;
+}
+@keyframes progress {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 0; }
 }
 </style>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NInput, NButton } from 'naive-ui'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlaneUrl } from '@/composables/usePlaneUrl'
 import { useSSE } from '@/composables/useSSE'
@@ -16,27 +15,25 @@ watch(() => settingsStore.serverUrl, () => {
 
 <template>
   <div class="controls">
-    <NInput
-      v-model:value="settingsStore.serverUrl"
-      size="small"
+    <input
+      v-model="settingsStore.serverUrl"
+      class="input server-url"
       placeholder="http://127.0.0.1:8787"
-      class="server-url"
     />
-    <NButton
-      type="primary"
-      size="small"
+    <button
+      class="btn btn-primary"
       :disabled="!parsedUrl || isAnalyzing"
       @click="parsedUrl && startAnalysis(parsedUrl, settingsStore.serverUrl)"
     >
       开始分析
-    </NButton>
-    <NButton
-      size="small"
+    </button>
+    <button
+      class="btn btn-secondary"
       :disabled="!isAnalyzing"
       @click="stopAnalysis"
     >
       停止
-    </NButton>
+    </button>
   </div>
 </template>
 
@@ -46,6 +43,7 @@ watch(() => settingsStore.serverUrl, () => {
   gap: 8px;
   padding: 10px 16px;
   align-items: center;
+  flex-shrink: 0;
 }
 .server-url {
   flex: 1;

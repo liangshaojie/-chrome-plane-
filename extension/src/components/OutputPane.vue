@@ -1,32 +1,35 @@
 <script setup lang="ts">
-import { NScrollbar } from 'naive-ui'
 import { useAnalysisStore } from '@/stores/analysis'
 
 const analysisStore = useAnalysisStore()
 </script>
 
 <template>
-  <NScrollbar style="max-height: 400px">
-    <pre v-if="analysisStore.outputText" class="output">{{ analysisStore.outputText }}</pre>
+  <div class="output-pane">
+    <pre v-if="analysisStore.outputText">{{ analysisStore.outputText }}</pre>
     <div v-else class="empty">暂无分析结果</div>
-  </NScrollbar>
+  </div>
 </template>
 
 <style scoped>
-.output {
-  margin: 0;
+.output-pane {
+  flex: 1;
+  overflow-y: auto;
   padding: 12px 16px;
+}
+.output-pane pre {
+  margin: 0;
   font-size: 12px;
-  font-family: monospace;
+  font-family: 'SF Mono', Consolas, monospace;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #1f2937;
+  color: var(--text);
   line-height: 1.6;
 }
 .empty {
   padding: 24px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 13px;
 }
 </style>

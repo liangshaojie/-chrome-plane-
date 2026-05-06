@@ -1,40 +1,54 @@
 <script setup lang="ts">
-import { NCard, NSpace, NTag, NText } from 'naive-ui'
 import { useAnalysisStore } from '@/stores/analysis'
 
 const analysisStore = useAnalysisStore()
 </script>
 
 <template>
-  <NCard v-if="analysisStore.issue" size="small" class="issue-card" :bordered="false">
-    <NSpace vertical :size="4">
-      <NSpace align="center">
-        <NTag size="tiny" type="info">{{ analysisStore.issue.identifier }}</NTag>
-        <NText strong>{{ analysisStore.issue.title }}</NText>
-      </NSpace>
-      <NSpace :size="12">
-        <NText v-if="analysisStore.issue.state" depth="3" style="font-size:12px">
-          状态：{{ analysisStore.issue.state }}
-        </NText>
-        <NText v-if="analysisStore.issue.labels?.length" depth="3" style="font-size:12px">
-          标签：{{ analysisStore.issue.labels.join(', ') }}
-        </NText>
-      </NSpace>
-      <a :href="analysisStore.issue.url" target="_blank" class="issue-link">
-        {{ analysisStore.issue.url }}
-      </a>
-    </NSpace>
-  </NCard>
+  <div v-if="analysisStore.issue" class="issue-card">
+    <div class="issue-header">
+      <span class="tag tag-info">{{ analysisStore.issue.identifier }}</span>
+      <span class="issue-title">{{ analysisStore.issue.title }}</span>
+    </div>
+    <div class="issue-meta">
+      <span v-if="analysisStore.issue.state">状态：{{ analysisStore.issue.state }}</span>
+      <span v-if="analysisStore.issue.labels?.length">标签：{{ analysisStore.issue.labels.join(', ') }}</span>
+    </div>
+    <a :href="analysisStore.issue.url" target="_blank" class="issue-link">
+      {{ analysisStore.issue.url }}
+    </a>
+  </div>
 </template>
 
 <style scoped>
 .issue-card {
   margin: 0 16px 8px;
-  background: #f8fafc;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.issue-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.issue-title {
+  font-weight: 500;
+  font-size: 13px;
+}
+.issue-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
 }
 .issue-link {
   font-size: 11px;
-  color: #64748b;
+  color: var(--text-muted);
   text-decoration: none;
 }
 .issue-link:hover {
