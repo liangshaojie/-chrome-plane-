@@ -7,6 +7,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { registerAnalyzeRoute } from "./routes/analyze.js";
 import { registerWriteRoutes } from "./routes/write.js";
+import { registerIssueDetailRoute } from "./routes/issue-detail.js";
+import { registerProxyImageRoute } from "./routes/proxy-image.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -34,6 +36,8 @@ app.get("/health", async () => ({
  */
 await registerAnalyzeRoute(app);
 await registerWriteRoutes(app);
+await registerIssueDetailRoute(app);
+await registerProxyImageRoute(app);
 
 /**
  * 启动服务器

@@ -2,12 +2,30 @@ import { ref } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
 import type { AgentEvent } from '@/types/events'
 
+export interface ParsedPlaneUrl {
+  workspaceSlug: string
+  issueIdentifier: string
+}
+
+async function fetchImageAsBase64(url: string, serverUrl: string): Promise<{ base64: string; mimeType: string } | null> {
+  try {
+    const proxyUrl = `${serverUrl.replace(/\/$/, '')}/proxy-image?url=${encodeURIComponent(url)}`
+    const res = await fetch(proxyUrl)
+    if (!res.ok) return null
+    const data = await res.json() as { ok: boolean; base64?: string; mimeType?: string; error?: string }
+    if (!data.ok || !data.base64) return null
+    return { base64: data.base64, mimeType: data.mimeType ?? 'image/png' }
+  } catch {
+    return null
+  }
+}
+
 export function useSSE() {
   const isAnalyzing = ref(false)
   const abortCtrl = ref<AbortController | null>(null)
   const analysisStore = useAnalysisStore()
 
-  async function startAnalysis(parsed: { workspaceSlug: string; issueIdentifier: string }, serverUrl: string) {
+  async function startAnalysis(parsed: ParsedPlaneUrl, serverUrl: string) {
     if (isAnalyzing.value) return
     const url = serverUrl.replace(/\/$/, '')
     if (!url) {
@@ -23,10 +41,34 @@ export function useSSE() {
     abortCtrl.value = new AbortController()
 
     try {
-      const res = await fetch(`${url}/analyze`, {
+      // Step 1: 获取 description_html 和图片 asset URL 列表
+      const detailRes = await fetch(`${url}/issue-detail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed),
+        signal: abortCtrl.value.signal,
+      })
+      if (!detailRes.ok) throw new Error(`issue-detail 失败 ${detailRes.status}`)
+      const { imageAssetUrls } = await detailRes.json().catch(() => ({ imageAssetUrls: [] as string[] }))
+
+      // Step 2: 前端下载图片（带 Cookie）- 转换 asset URL 为 base64
+      const images: { url: string; base64: string; mimeType: string }[] = []
+      if (imageAssetUrls?.length) {
+        analysisStore.setStatus(`下载图片中…（0/${imageAssetUrls.length}）`)
+        for (let i = 0; i < imageAssetUrls.length; i++) {
+          analysisStore.setStatus(`下载图片中…（${i + 1}/${imageAssetUrls.length}）`)
+          const result = await fetchImageAsBase64(imageAssetUrls[i], url)
+          if (result) {
+            images.push({ url: imageAssetUrls[i], ...result })
+          }
+        }
+      }
+
+      // Step 3: 发送分析请求（带上图片 base64）
+      const res = await fetch(`${url}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...parsed, images }),
         signal: abortCtrl.value.signal,
       })
 

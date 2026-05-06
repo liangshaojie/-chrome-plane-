@@ -52,6 +52,7 @@ export interface AnalyzableIssue {
   labels: string[];
   assignees: string[];
   comments: { author: string; text: string; createdAt?: string }[];
+  images?: { url: string; base64: string; mimeType: string }[];
 }
 
 function assertToken() {
@@ -195,10 +196,47 @@ export async function listIssueComments(
   }
 }
 
-// 把以上三步聚合，输出便于喂给 Claude 的结构
-export async function fetchAnalyzableIssue(
+// 从 description_html 中提取所有图片的 asset URL（支持 <img> 和 <image-component> 两种标签）
+// image-component 的 src 是 Plane 文件 ID，需要拼成完整 asset URL
+export function extractImageAssetUrls(html: string, workspaceSlug: string, projectId: string): string[] {
+  const urls: string[] = [];
+  // <img src="...">
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let m;
+  while ((m = imgRegex.exec(html)) !== null) {
+    urls.push(m[1]);
+  }
+  // <image-component src="..."> -> 拼成 Plane asset URL
+  const assetBase = `https://api.plane.so/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}`;
+  const compRegex = /<image-component[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  while ((m = compRegex.exec(html)) !== null) {
+    urls.push(`${assetBase}/${m[1]}/?disposition=inline`);
+  }
+  return urls;
+}
+
+// 返回 issue 详情（含 description_html 和图片 asset URL），供前端下载图片
+export async function fetchIssueDetail(
   workspaceSlug: string,
   identifier: string
+): Promise<{ description_html: string; imageAssetUrls: string[] }> {
+  const { projectId, issueId } = await resolveIssueIds(workspaceSlug, identifier);
+  const issue = await getIssueDetail(workspaceSlug, projectId, issueId);
+  const imageAssetUrls = issue.description_html
+    ? extractImageAssetUrls(issue.description_html, workspaceSlug, projectId)
+    : [];
+  return {
+    description_html: issue.description_html ?? "",
+    imageAssetUrls,
+  };
+}
+
+// 把以上三步聚合，输出便于喂给 Claude 的结构
+// images 由调用方从 description_html 解析后传入（前端有浏览器 Cookie 可下载）
+export async function fetchAnalyzableIssue(
+  workspaceSlug: string,
+  identifier: string,
+  images?: { url: string; base64: string; mimeType: string }[]
 ): Promise<AnalyzableIssue> {
   const { projectId, issueId, project, sequenceId } = await resolveIssueIds(
     workspaceSlug,
@@ -208,6 +246,7 @@ export async function fetchAnalyzableIssue(
     getIssueDetail(workspaceSlug, projectId, issueId),
     listIssueComments(workspaceSlug, projectId, issueId),
   ]);
+
   return {
     workspaceSlug,
     identifier: `${project.identifier}-${sequenceId}`,
@@ -223,6 +262,7 @@ export async function fetchAnalyzableIssue(
       text: c.comment_stripped ?? "",
       createdAt: c.created_at,
     })),
+    images: images?.length ? images : undefined,
   };
 }
 

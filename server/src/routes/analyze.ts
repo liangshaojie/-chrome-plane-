@@ -1,5 +1,6 @@
 // POST /analyze
-// body: { workspaceSlug, issueIdentifier }
+// body: { workspaceSlug, issueIdentifier, images? }
+// images: [{ url, base64, mimeType }] - 前端下载好的图片 base64
 // 返回 SSE 流：data: <json>\n\n
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -9,11 +10,16 @@ import { analyzeIssue } from "../agent.js";
 const Body = z.object({
   workspaceSlug: z.string().min(1),
   issueIdentifier: z.string().regex(/^[A-Za-z0-9]+-\d+$/),
+  images: z.array(z.object({
+    url: z.string(),
+    base64: z.string(),
+    mimeType: z.string(),
+  })).optional(),
 });
 
 /**
  * 注册分析路由
- * @param app 
+ * @param app
  */
 export async function registerAnalyzeRoute(app: FastifyInstance) {
   app.post("/analyze", async (req, reply) => {
@@ -21,7 +27,7 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     if (!parse.success) {
       return reply.code(400).send({ error: "参数错误", detail: parse.error.flatten() });
     }
-    const { workspaceSlug, issueIdentifier } = parse.data;
+    const { workspaceSlug, issueIdentifier, images } = parse.data;
 
     // SSE 头
     reply.raw.writeHead(200, {
@@ -31,10 +37,6 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
       "X-Accel-Buffering": "no",
     });
 
-    // 注意：不使用 req.raw.on('close') 来判断"客户端已断开"——这个事件在
-    // Node 某些版本的 HTTP keep-alive 连接上会在请求体读完时就误触发，导致
-    // 我们以为客户端断开而提前 return，SDK 的后续消息就被丢弃。
-    // 改为：尝试写 SSE 时如果 reply.raw 已 destroyed 就判定断开。
     const ac = new AbortController();
 
     const send = (event: any): boolean => {
@@ -54,15 +56,16 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     };
 
     try {
-      req.log.info({ workspaceSlug, issueIdentifier }, "analyze start");
+      req.log.info({ workspaceSlug, issueIdentifier, imageCount: images?.length ?? 0 }, "analyze start");
       send({ type: "status", message: "正在拉取 Plane workItem..." });
-      const issue = await fetchAnalyzableIssue(workspaceSlug, issueIdentifier);
+      const issue = await fetchAnalyzableIssue(workspaceSlug, issueIdentifier, images);
       req.log.info(
         {
           identifier: issue.identifier,
           title: issue.title,
           descLen: issue.description.length,
           comments: issue.comments.length,
+          imageCount: issue.images?.length ?? 0,
         },
         "issue fetched"
       );

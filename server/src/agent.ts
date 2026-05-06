@@ -33,6 +33,16 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     ? `\n\n你可以使用 /skill-name 调用技能来扩展能力，例如 /xiangyu-plane-project:create-task 创建 Plane 子任务。\n可用技能来源：${SKILL_TOOL_ROOTS.join("、")}`
     : "";
 
+  const imageHint =
+    issue.images && issue.images.length > 0
+      ? `\n\n【工作项描述中的图片】（共 ${issue.images.length} 张）\n${issue.images
+          .map(
+            (img, i) =>
+              `![图片${i + 1}](data:${img.mimeType};base64,${img.base64})`
+          )
+          .join("\n")}`
+      : "";
+
   return [
     "你是一位资深前端架构师，请分析下面这条来自 Plane 的工作项。",
     "请先判断它属于【Bug】还是【需求】，再给出分析：",
@@ -64,6 +74,7 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     "",
     "[描述]",
     issue.description || "（无描述）",
+    imageHint,
     "",
     "[评论]",
     commentsBlock,
@@ -91,6 +102,7 @@ export async function* analyzeIssue(
   console.log("[agent] codeRoot =", codeRoot);
   console.log("[agent] allowedTools =", allowedTools);
   console.log("[agent] prompt length =", prompt.length);
+  console.log("[agent] ========== prompt full text ==========\n", prompt, "\n==========================================");
 
   let msgCount = 0;
   const t0 = Date.now();
@@ -112,6 +124,7 @@ export async function* analyzeIssue(
       msgCount++;
       const m: any = msg;
 
+      // 打印完整消息详情（含 tool_use / tool_result 的 input 和 content）
       try {
         const brief = {
           n: msgCount,
@@ -123,13 +136,14 @@ export async function* analyzeIssue(
                 type: b?.type,
                 textLen: typeof b?.text === "string" ? b.text.length : undefined,
                 toolName: b?.name,
+                toolInput: b?.input,
               }))
             : undefined,
           usage: m?.message?.usage,
         };
-        console.log("[agent] raw msg:", JSON.stringify(brief));
+        console.log("[agent] raw msg:", JSON.stringify(brief, null, 2));
       } catch (_e) {
-        console.log("[agent] raw msg:", m?.type);
+        console.log("[agent] raw msg:", JSON.stringify(m, null, 2));
       }
 
       if (signal?.aborted) {
@@ -189,6 +203,7 @@ export async function* analyzeIssue(
             } else if (raw != null) {
               text = JSON.stringify(raw);
             }
+            console.log(`[agent] tool_result for ${block.tool_use_id}:`, text.slice(0, 300));
             yield {
               type: "tool_result",
               toolUseId: String(block.tool_use_id ?? ""),
