@@ -1,7 +1,9 @@
 // GET /proxy-image?url=<encoded_image_url>
 // 代理下载 Plane 图片：优先用 Bearer Token 访问 asset API（会 302 → S3 presigned URL）
 // 若返回 401，则用 redirect: 'manual' 拿到 Location（S3 presigned URL）直接下载（无需认证）
+// 最后回退到 Playwright 自动化模拟登录下载
 import type { FastifyInstance } from "fastify";
+import { getPlaywrightDownloader } from "../playwright-image-downloader.js";
 
 export async function registerProxyImageRoute(app: FastifyInstance) {
   app.get("/proxy-image", {
@@ -71,6 +73,19 @@ export async function registerProxyImageRoute(app: FastifyInstance) {
           }
           return reply.code(502).send({ error: `S3 下载失败 ${s3Res.status}`, url: location })
         }
+      }
+
+      // Step 3: 回退到 Playwright 自动化下载
+      req.log.info('Trying Playwright fallback...')
+      try {
+        const downloader = await getPlaywrightDownloader()
+        const result = await downloader.downloadImage(decodedUrl)
+        if (result) {
+          req.log.info({ source: 'playwright' }, 'image fetched via Playwright')
+          return { ok: true, base64: result.base64, mimeType: result.mimeType }
+        }
+      } catch (playwrightErr: any) {
+        req.log.error({ err: playwrightErr }, 'Playwright fallback failed')
       }
 
       return reply.code(502).send({

@@ -8,47 +8,30 @@ export interface ParsedPlaneUrl {
 }
 
 /**
- * 通过 content script 下载图片
- * 用户使用的是官方 Plane（app.plane.so），asset URL 鉴权依赖 plane.so 页面的 session cookie，
- * 所以必须从 content script 里发起 fetch（带 credentials:'include'）。
+ * 通过服务端 /proxy-image 下载图片（使用 Playwright 自动化保持登录态）
  */
-async function downloadImagesViaContentScript(
+async function downloadImagesViaProxy(
+  serverUrl: string,
   urls: string[]
 ): Promise<{ url: string; base64: string; mimeType: string }[]> {
-  return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs[0]?.id
-      if (!tabId) {
-        console.warn('[useSSE] 未找到当前 tab')
-        resolve([])
-        return
+  const results: { url: string; base64: string; mimeType: string }[] = []
+  for (const imgUrl of urls) {
+    try {
+      const proxyUrl = `${serverUrl}/proxy-image?url=${encodeURIComponent(imgUrl)}`
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) })
+      if (!res.ok) {
+        console.warn('[useSSE] proxy-image failed for', imgUrl, res.status)
+        continue
       }
-      const timeout = setTimeout(() => {
-        console.warn('[useSSE] content script 下载超时（30s）')
-        resolve([])
-      }, 30000)
-      try {
-        chrome.tabs.sendMessage(tabId, { type: 'downloadImages', urls }, (resp) => {
-          clearTimeout(timeout)
-          const lastErr = chrome.runtime.lastError
-          if (lastErr) {
-            console.warn('[useSSE] sendMessage 失败：', lastErr.message, '——请刷新一下 plane.so 页面让 content script 重新注入')
-            resolve([])
-            return
-          }
-          console.log('[useSSE] content script 响应：', {
-            requested: urls.length,
-            received: resp?.results?.length ?? 0,
-          })
-          resolve(resp?.results ?? [])
-        })
-      } catch (e) {
-        clearTimeout(timeout)
-        console.error('[useSSE] sendMessage 异常：', e)
-        resolve([])
+      const data = await res.json()
+      if (data.ok && data.base64) {
+        results.push({ url: imgUrl, base64: data.base64, mimeType: data.mimeType })
       }
-    })
-  })
+    } catch (e) {
+      console.error('[useSSE] proxy-image error for', imgUrl, e)
+    }
+  }
+  return results
 }
 
 export function useSSE() {
@@ -82,11 +65,12 @@ export function useSSE() {
       if (!detailRes.ok) throw new Error(`issue-detail 失败 ${detailRes.status}`)
       const { imageAssetUrls } = await detailRes.json().catch(() => ({ imageAssetUrls: [] as string[] }))
 
-      // Step 2: 通过 content script 下载图片（它运行在 plane.so 页面，有页面 session cookie）
+      // Step 2: 通过服务端 /proxy-image 下载图片（使用 Playwright 自动化保持登录态）
       const images: { url: string; base64: string; mimeType: string }[] = []
       if (imageAssetUrls?.length) {
         analysisStore.setStatus(`下载图片中…（0/${imageAssetUrls.length}）`)
-        const results = await downloadImagesViaContentScript(imageAssetUrls)
+        const results = await downloadImagesViaProxy(url, imageAssetUrls)
+
         for (let i = 0; i < results.length; i++) {
           analysisStore.setStatus(`下载图片中…（${i + 1}/${imageAssetUrls.length}）`)
           images.push(results[i])

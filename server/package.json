@@ -14,9 +14,11 @@
     "@fastify/cors": "^9.0.1",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
+    "playwright": "^1.49.0",
     "zod": "^4.4.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20.14.10",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3"
