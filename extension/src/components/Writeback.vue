@@ -71,23 +71,23 @@ async function postComment() {
 
 <template>
   <div v-if="analysisStore.showWriteback" class="writeback">
+    <div class="writeback-header">
+      <span class="writeback-title">写回 Plane</span>
+      <span class="writeback-hint">分析结果可编辑</span>
+    </div>
     <textarea
       v-model="analysisStore.writebackText"
       class="textarea"
       placeholder="分析结果将在此显示"
-      rows="4"
+      rows="5"
     />
     <div class="writeback-actions">
-      <button
-        class="btn btn-primary"
-        :disabled="loading"
-        @click="updateDescription"
-      >覆盖描述</button>
-      <button
-        class="btn btn-secondary"
-        :disabled="loading"
-        @click="postComment"
-      >发布评论</button>
+      <button class="btn btn-primary btn-sm" :disabled="loading" @click="updateDescription">
+        覆盖描述
+      </button>
+      <button class="btn btn-secondary btn-sm" :disabled="loading" @click="postComment">
+        发布评论
+      </button>
     </div>
     <div
       v-if="analysisStore.writebackStatus"
@@ -100,9 +100,27 @@ async function postComment() {
 
 <style scoped>
 .writeback {
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
   flex-shrink: 0;
+}
+.writeback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.writeback-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.writeback-hint {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 .writeback-actions {
   display: flex;
@@ -110,7 +128,7 @@ async function postComment() {
   margin-top: 8px;
 }
 .writeback-status {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
   color: var(--text-muted);
 }

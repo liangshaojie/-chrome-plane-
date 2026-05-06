@@ -25,6 +25,7 @@ watch(() => settingsStore.serverUrl, () => {
       :disabled="!parsedUrl || isAnalyzing"
       @click="parsedUrl && startAnalysis(parsedUrl, settingsStore.serverUrl)"
     >
+      <span class="btn-icon">▶</span>
       开始分析
     </button>
     <button
@@ -32,7 +33,7 @@ watch(() => settingsStore.serverUrl, () => {
       :disabled="!isAnalyzing"
       @click="stopAnalysis"
     >
-      停止
+      ■ 停止
     </button>
   </div>
 </template>
@@ -43,9 +44,15 @@ watch(() => settingsStore.serverUrl, () => {
   gap: 8px;
   padding: 10px 16px;
   align-items: center;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 .server-url {
   flex: 1;
+  max-width: 280px;
+}
+.btn-icon {
+  font-size: 10px;
 }
 </style>

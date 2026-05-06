@@ -6,11 +6,10 @@ const analysisStore = useAnalysisStore()
 
 <template>
   <div class="status-bar">
-    <div
-      v-if="analysisStore.phase === 'analyzing'"
-      class="progress-bar"
-    />
-    <span :class="{ 'text-error': analysisStore.phase === 'error' }">
+    <div v-if="analysisStore.phase === 'analyzing'" class="progress-track">
+      <div class="progress-fill" />
+    </div>
+    <span :class="['status-text', analysisStore.phase === 'error' && 'error', analysisStore.phase === 'done' && 'success']">
       {{ analysisStore.statusMessage || '等待分析...' }}
     </span>
   </div>
@@ -18,26 +17,42 @@ const analysisStore = useAnalysisStore()
 
 <style scoped>
 .status-bar {
-  padding: 4px 16px 6px;
-  min-height: 20px;
+  padding: 8px 16px;
   flex-shrink: 0;
-  font-size: 12px;
-  color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 32px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
 }
-.progress-bar {
-  height: 3px;
+.progress-track {
   flex: 1;
-  background: linear-gradient(90deg, var(--primary) 0%, var(--primary) 50%, transparent 50%);
-  background-size: 20px 100%;
-  animation: progress 1s linear infinite;
+  max-width: 120px;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
   border-radius: 2px;
-  max-width: 100px;
+  overflow: hidden;
 }
-@keyframes progress {
-  0% { background-position: 0 0; }
-  100% { background-position: 20px 0; }
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  animation: slide 1.2s ease-in-out infinite;
+}
+@keyframes slide {
+  0% { width: 0%; margin-left: 0; }
+  50% { width: 70%; margin-left: 15%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+.status-text {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.status-text.error {
+  color: var(--error);
+}
+.status-text.success {
+  color: var(--success);
 }
 </style>

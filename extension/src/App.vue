@@ -39,6 +39,7 @@ onMounted(() => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  background: var(--bg);
 }
 .pane-container {
   flex: 1;
