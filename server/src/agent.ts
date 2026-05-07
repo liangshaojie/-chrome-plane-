@@ -1,6 +1,6 @@
 // Claude Agent SDK 调用封装：把 Plane 工作项转成中文 prompt，
 // 通过 query() 流式产出分析结果。
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { query, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { AnalyzableIssue } from "./plane.js";
 import { ENABLE_SKILLS, SKILL_TOOL_ROOTS } from "./env.js";
 
@@ -120,6 +120,19 @@ export async function* analyzeIssue(
 
     // 让 Claude Code 自由调用所有 user/project 设置中的 MCP 工具（包含 minimax 图像理解 MCP）
     // 因此这里不再硬限制 allowedTools，并把 permissionMode 设为 bypassPermissions 以避免 MCP 工具被权限弹窗拦截。
+    // 注入 MiniMax MCP，使 Agent 能调用图像理解等工具
+    const mcpServers: Record<string, McpServerConfig> = {
+      "minimax-mcp": {
+        type: "stdio",
+        command: "uvx",
+        args: ["minimax-coding-plan-mcp", "-y"],
+        env: {
+          MINIMAX_API_KEY: process.env.MINIMAX_API_KEY ?? "",
+          MINIMAX_API_HOST: process.env.MINIMAX_API_HOST ?? "https://api.minimaxi.com",
+        },
+      },
+    };
+
     for await (const msg of query({
       prompt,
       options: {
@@ -129,6 +142,7 @@ export async function* analyzeIssue(
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         maxTurns: 20,
+        mcpServers,
       },
     })) {
       msgCount++;
