@@ -48,10 +48,11 @@ await registerProxyImageRoute(app);
  * 启动服务器
  */
 const port = Number(process.env.PORT ?? 8787);
+const host = process.env.HOST ?? "10.10.10.62";
 app
-  .listen({ host: "127.0.0.1", port })
+  .listen({ host, port })
   .then(() => {
-    app.log.info(`chrome-plane server listening on http://127.0.0.1:${port}`);
+    app.log.info(`chrome-plane server listening on http://${host}:${port}`);
   })
   .catch((err) => {
     app.log.error(err);
