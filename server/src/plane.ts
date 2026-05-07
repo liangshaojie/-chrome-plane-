@@ -7,13 +7,19 @@
 const getBase = () => process.env.PLANE_BASE_URL ?? "https://api.plane.so";
 const getToken = () => process.env.PLANE_API_TOKEN ?? "";
 
-// 从 PLANE_BASE_URL 提取 API 基础地址（去掉协议，保留域名）
-// 例如 https://support.max-optics.com → https://api.support.max-optics.com
+// 从 PLANE_BASE_URL 提取 API 基础地址
+// 例如 https://support.max-optics.com → https://support.max-optics.com
+// 例如 https://app.plane.so            → https://api.plane.so
 const getApiBase = () => {
   const base = getBase(); // e.g. "https://support.max-optics.com"
   try {
     const u = new URL(base);
-    return `https://api.${u.host}`;
+    // 自托管 Plane 实例（如 max-optics.com）API 直接在主域名
+    // 官方 plane.so 则走 api.plane.so
+    if (u.hostname.includes("plane.so")) {
+      return `https://api.${u.host}`;
+    }
+    return base; // 自托管：API 同主域名
   } catch {
     return "https://api.plane.so";
   }
