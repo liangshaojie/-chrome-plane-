@@ -79,7 +79,8 @@ export class PlaywrightImageDownloader {
       // 第一步：输入邮箱，点击 Continue
       const emailInput = page.getByRole("textbox", { name: "Email" });
       console.log("[playwright] 填写邮箱...");
-      await emailInput.fill(PLANE_EMAIL!);
+      await emailInput.click();
+      await emailInput.pressSequentially(PLANE_EMAIL!, { delay: 80 });
 
       const continueBtn = page.getByRole("button", { name: "Continue" });
       console.log("[playwright] 点击 Continue...");
@@ -92,7 +93,8 @@ export class PlaywrightImageDownloader {
       // 第二步：输入密码，点击 Continue
       const passwordInput = page.getByRole("textbox", { name: "Password" });
       console.log("[playwright] 填写密码...");
-      await passwordInput.fill(PLANE_PASSWORD!);
+      await passwordInput.click();
+      await passwordInput.pressSequentially(PLANE_PASSWORD!, { delay: 80 });
 
       console.log("[playwright] 点击 Continue...");
       await continueBtn.click();
