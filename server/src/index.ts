@@ -2,13 +2,18 @@
 // ⚠️ 必须最先 import ./env —— ESM 里 import 会在任何语句之前执行，
 // 若在这里用 dotenv.config() 语句，反而会晚于下面几个 import 的模块顶层代码。
 import "./env.js";
-
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import { execSync } from "child_process";
 import { registerAnalyzeRoute } from "./routes/analyze.js";
 import { registerWriteRoutes } from "./routes/write.js";
 import { registerIssueDetailRoute } from "./routes/issue-detail.js";
 import { registerProxyImageRoute } from "./routes/proxy-image.js";
+
+// Fix: Windows 终端中文乱码，设置代码页为 UTF-8
+if (process.platform === "win32") {
+  try { execSync("chcp 65001", { stdio: "pipe" }); } catch { /* ignore */ }
+}
 
 const app = Fastify({ logger: { level: "info" } });
 
