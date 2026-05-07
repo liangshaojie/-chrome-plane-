@@ -6,6 +6,7 @@
   "permissions": ["sidePanel", "activeTab", "tabs", "storage", "cookies"],
   "host_permissions": [
     "https://*.plane.so/*",
+    "https://*.max-optics.com/*",
     "http://127.0.0.1:8787/*",
     "http://localhost:8787/*"
   ],
@@ -14,7 +15,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.plane.so/*"],
+      "matches": ["https://*.plane.so/*", "https://*.max-optics.com/*"],
       "js": ["content-script.js"],
       "run_at": "document_idle"
     }

@@ -13,7 +13,7 @@ export function usePlaneUrl() {
     if (!url) return null
     try {
       const u = new URL(url)
-      if (!u.hostname.endsWith('plane.so')) return null
+      if (!u.hostname.endsWith('plane.so') && !u.hostname.endsWith('max-optics.com')) return null
       const parts = u.pathname.split('/').filter(Boolean)
       const browseIdx = parts.indexOf('browse')
       if (browseIdx < 1 || browseIdx + 1 >= parts.length) return null
@@ -28,7 +28,7 @@ export function usePlaneUrl() {
 
   const parsedUrl = computed(() => parsePlaneUrl(currentTabUrl.value))
   const metaText = computed(() => {
-    if (!parsedUrl.value) return '未识别 Plane 链接（请打开 app.plane.so 的 workItem 页面）'
+    if (!parsedUrl.value) return '未识别 Plane 链接（请打开 Plane 的 workItem 页面）'
     return `${parsedUrl.value.workspaceSlug} / ${parsedUrl.value.issueIdentifier}`
   })
 

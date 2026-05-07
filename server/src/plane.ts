@@ -7,6 +7,18 @@
 const getBase = () => process.env.PLANE_BASE_URL ?? "https://api.plane.so";
 const getToken = () => process.env.PLANE_API_TOKEN ?? "";
 
+// 从 PLANE_BASE_URL 提取 API 基础地址（去掉协议，保留域名）
+// 例如 https://support.max-optics.com → https://api.support.max-optics.com
+const getApiBase = () => {
+  const base = getBase(); // e.g. "https://support.max-optics.com"
+  try {
+    const u = new URL(base);
+    return `https://api.${u.host}`;
+  } catch {
+    return "https://api.plane.so";
+  }
+};
+
 // 简易内存缓存：避免每次都去 list projects
 const projectCache = new Map<string, PlaneProject[]>(); // workspaceSlug -> projects
 const issueIdCache = new Map<string, { projectId: string; issueId: string }>(); // `${slug}/${ident}` -> ids
@@ -206,7 +218,7 @@ export async function listIssueComments(
 //   4) 任意标签里出现 src="<assetId>"，且 assetId 是 UUID 形式
 export function extractImageAssetUrls(html: string, workspaceSlug: string, projectId: string): string[] {
   const urls = new Set<string>();
-  const assetBase = `https://api.plane.so/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}`;
+  const assetBase = `${getApiBase()}/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}`;
   const uuidRe = /^[0-9a-fA-F-]{32,40}$/; // 粗略 uuid 判定
 
   const pushSrc = (raw: string) => {
@@ -221,9 +233,9 @@ export function extractImageAssetUrls(html: string, workspaceSlug: string, proje
       urls.add(`${assetBase}/${raw.trim()}/?disposition=inline`);
       return;
     }
-    // 退化处理：以 / 开头的相对路径，拼到 plane.so 根域
+    // 退化处理：以 / 开头的相对路径，拼到 API 基础地址
     if (raw.startsWith("/")) {
-      urls.add(`https://api.plane.so${raw}`);
+      urls.add(`${getApiBase()}${raw}`);
       return;
     }
   };
@@ -274,7 +286,7 @@ export async function fetchAnalyzableIssue(
   return {
     workspaceSlug,
     identifier: `${project.identifier}-${sequenceId}`,
-    url: `https://app.plane.so/${workspaceSlug}/browse/${project.identifier}-${sequenceId}/`,
+    url: `https://support.max-optics.com/${workspaceSlug}/browse/${project.identifier}-${sequenceId}/`,
     title: issue.name,
     description: issue.description_stripped ?? "",
     state: issue.state_detail?.name ?? issue.state ?? "",
