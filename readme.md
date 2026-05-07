@@ -23,7 +23,7 @@ Chrome 扩展 (Side Panel)  ──HTTP/SSE──►  本地 Node 服务 (Fastify
 cd server
 cp .env.example .env   # 填写 PLANE_API_TOKEN / ANTHROPIC_API_KEY
 pnpm install           # 或 npm install
-pnpm dev               # http://127.0.0.1:8787
+pnpm dev               # http://10.10.10.62:8787
 ```
 
 可选：在 `.env` 中设置 `LOCAL_CODE_ROOT=/path/to/your-repo`，

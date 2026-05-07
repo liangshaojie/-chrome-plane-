@@ -11,7 +11,7 @@ pnpm install          # 或 npm install / yarn
 pnpm dev              # tsx watch src/index.ts
 ```
 
-默认监听 `http://127.0.0.1:8787`。
+默认监听 `http://10.10.10.62:8787`。
 
 ## 接口
 

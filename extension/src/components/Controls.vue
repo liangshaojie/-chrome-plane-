@@ -18,7 +18,7 @@ watch(() => settingsStore.serverUrl, () => {
     <input
       v-model="settingsStore.serverUrl"
       class="input server-url"
-      placeholder="http://127.0.0.1:8787"
+      placeholder="http://10.10.10.62:8787"
     />
     <button
       class="btn btn-primary"
