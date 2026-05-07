@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const serverUrl = ref('http://127.0.0.1:8787')
+  const serverUrl = ref('http://10.10.10.62:8787')
 
   async function loadFromStorage() {
     if (!chrome?.storage?.local) return

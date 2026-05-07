@@ -7,6 +7,7 @@
   "host_permissions": [
     "https://*.plane.so/*",
     "https://*.max-optics.com/*",
+    "http://10.10.10.62:8787/*",
     "http://127.0.0.1:8787/*",
     "http://localhost:8787/*"
   ],
