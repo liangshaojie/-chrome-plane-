@@ -37,6 +37,7 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
   // 由 Claude 主动调用已配置的 MCP 图像理解工具（例如 minimax 的 image understanding MCP）来分析。
   // 不再走多模态 content block —— 我们用的网关（如 MiniMax-Anthropic 兼容协议）不一定支持 vision。
   const imagePaths = issue.imageFilePaths ?? [];
+  const commentImageUrls = issue.commentImageUrls ?? [];
   const imageHint =
     imagePaths.length > 0
       ? [
@@ -48,6 +49,16 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
           "把图片中的关键信息（界面截图、报错堆栈、流程图、设计稿等）作为分析依据。",
           "如果没有可用的 MCP 图像工具，再退化为通过 Read 工具读取这些文件元信息。",
           "请在最终分析里明确说明你识别到的图片内容。",
+        ].join("\n")
+      : "";
+  const commentImageHint =
+    commentImageUrls.length > 0
+      ? [
+          "",
+          `【评论中的图片】共 ${commentImageUrls.length} 张，URL 如下（需下载分析）：`,
+          ...commentImageUrls.map((u, i) => `  ${i + 1}. ${u}`),
+          "",
+          "⚠️ 请通过 MCP 图像理解工具下载并分析这些评论图片，它们可能包含关键的截图、报错信息。",
         ].join("\n")
       : "";
 
@@ -83,6 +94,7 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     "[描述]",
     issue.description || "（无描述）",
     imageHint,
+    commentImageHint,
     "",
     "[评论]",
     commentsBlock,

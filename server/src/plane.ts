@@ -59,6 +59,19 @@ export interface PlaneComment {
   created_at?: string;
 }
 
+// 从 HTML 中提取图片 URL（复用 description 的提取逻辑）
+function extractImageAssetUrlsFromHtml(html: string): string[] {
+  const urls: string[] = [];
+  // <img src="...">
+  const imgRe = /<img[^>]+src="([^"]+)"/gi;
+  let m;
+  while ((m = imgRe.exec(html)) !== null) urls.push(m[1]);
+  // <image-component src="...">
+  const imgCompRe = /<image-component[^>]+src="([^"]+)"/gi;
+  while ((m = imgCompRe.exec(html)) !== null) urls.push(m[1]);
+  return urls;
+}
+
 export interface AnalyzableIssue {
   workspaceSlug: string;
   identifier: string; // 例如 "CSDK-2"
@@ -71,6 +84,8 @@ export interface AnalyzableIssue {
   assignees: string[];
   comments: { author: string; text: string; createdAt?: string }[];
   images?: { url: string; base64: string; mimeType: string }[];
+  /** 来自评论的图片 URL（待下载） */
+  commentImageUrls?: string[];
   // 图片落盘后的本地绝对路径，供 Claude 通过 MCP / Read 工具使用
   imageFilePaths?: string[];
 }
@@ -305,6 +320,10 @@ export async function fetchAnalyzableIssue(
       createdAt: c.created_at,
     })),
     images: images?.length ? images : undefined,
+    // 收集评论中的图片 URL
+    commentImageUrls: comments.flatMap((c) =>
+      c.comment_html ? extractImageAssetUrlsFromHtml(c.comment_html) : []
+    ),
   };
 }
 
