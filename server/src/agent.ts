@@ -133,6 +133,15 @@ export async function* analyzeIssue(
       },
     };
 
+    // 允许访问的额外目录（含代码仓库）
+    const additionalDirectories: string[] = [];
+    if (codeRoot) additionalDirectories.push(codeRoot);
+    // C:\mo-project\web-gui 如不同则一并加入
+    const extraRoot = "C:\\mo-project\\web-gui";
+    if (extraRoot !== codeRoot && !additionalDirectories.includes(extraRoot)) {
+      additionalDirectories.push(extraRoot);
+    }
+
     for await (const msg of query({
       prompt,
       options: {
@@ -143,6 +152,7 @@ export async function* analyzeIssue(
         allowDangerouslySkipPermissions: true,
         maxTurns: 20,
         mcpServers,
+        additionalDirectories,
       },
     })) {
       msgCount++;
