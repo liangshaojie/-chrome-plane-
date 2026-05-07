@@ -11,7 +11,7 @@ export interface ImageResult {
 // 环境变量
 const PLANE_EMAIL = process.env.PLAYWRIGHT_PLANE_EMAIL ?? process.env.PLANE_EMAIL;
 const PLANE_PASSWORD = process.env.PLAYWRIGHT_PLANE_PASSWORD ?? process.env.PLANE_PASSWORD;
-const PLANE_INSTANCE_URL = process.env.PLAYWRIGHT_PLANE_INSTANCE_URL ?? "https://app.plane.so";
+const PLANE_INSTANCE_URL = process.env.PLAYWRIGHT_PLANE_INSTANCE_URL ?? "https://support.max-optics.com";
 const HEADLESS = process.env.PLAYWRIGHT_HEADLESS !== "false";
 
 // 单例实例

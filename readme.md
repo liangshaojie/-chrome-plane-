@@ -33,7 +33,7 @@ pnpm dev               # http://127.0.0.1:8787
 
 1. Chrome 打开 `chrome://extensions/`，开启「开发者模式」
 2. 点击「加载已解压的扩展程序」，选择本仓库的 `extension/` 目录
-3. 打开任意 Plane workItem，例如 `https://app.plane.so/lsj/browse/CSDK-2/`
+3. 打开任意 Plane workItem，例如 `https://support.max-optics.com/lsj/browse/CSDK-2/`
 4. 点击工具栏的扩展图标 → 弹出右侧 Side Panel
 5. 点击「开始分析」即可看到流式分析结果
 
