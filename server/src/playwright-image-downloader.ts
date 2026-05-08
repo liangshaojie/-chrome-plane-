@@ -169,13 +169,8 @@ export class PlaywrightImageDownloader {
     }
   }
 
-  async downloadImages(urls: string[]): Promise<ImageResult[]> {
-    const results: ImageResult[] = [];
-    for (const url of urls) {
-      const result = await this.downloadImage(url);
-      if (result) results.push(result);
-    }
-    return results;
+  async downloadImages(urls: string[]): Promise<(ImageResult | null)[]> {
+    return Promise.all(urls.map((url) => this.downloadImage(url)));
   }
 
   async close(): Promise<void> {

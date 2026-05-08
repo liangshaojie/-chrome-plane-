@@ -59,17 +59,9 @@ export interface PlaneComment {
   created_at?: string;
 }
 
-// 从 HTML 中提取图片 URL（复用 description 的提取逻辑）
-function extractImageAssetUrlsFromHtml(html: string): string[] {
-  const urls: string[] = [];
-  // <img src="...">
-  const imgRe = /<img[^>]+src="([^"]+)"/gi;
-  let m;
-  while ((m = imgRe.exec(html)) !== null) urls.push(m[1]);
-  // <image-component src="...">
-  const imgCompRe = /<image-component[^>]+src="([^"]+)"/gi;
-  while ((m = imgCompRe.exec(html)) !== null) urls.push(m[1]);
-  return urls;
+// 从 HTML 中提取图片 URL，返回完整的 presigned asset URL
+function extractImageAssetUrlsFromHtml(html: string, workspaceSlug: string, projectId: string): string[] {
+  return extractImageAssetUrls(html, workspaceSlug, projectId);
 }
 
 export interface AnalyzableIssue {
@@ -322,7 +314,7 @@ export async function fetchAnalyzableIssue(
     images: images?.length ? images : undefined,
     // 收集评论中的图片 URL
     commentImageUrls: comments.flatMap((c) =>
-      c.comment_html ? extractImageAssetUrlsFromHtml(c.comment_html) : []
+      c.comment_html ? extractImageAssetUrlsFromHtml(c.comment_html, workspaceSlug, projectId) : []
     ),
   };
 }

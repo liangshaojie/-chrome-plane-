@@ -9,6 +9,7 @@ import path from "node:path";
 import os from "node:os";
 import { fetchAnalyzableIssue } from "../plane.js";
 import { analyzeIssue } from "../agent.js";
+import { downloadAndPersistCommentImages } from "../download-comment-images.js";
 
 // 把前端送来的 base64 图片落盘，返回绝对路径列表
 async function persistImages(
@@ -90,7 +91,8 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
       const issue = await fetchAnalyzableIssue(workspaceSlug, issueIdentifier, images);
       // 把图片落盘，传绝对路径给 agent，让 Claude 用 MCP / Read 工具分析
       const imageFilePaths = await persistImages(issueIdentifier, images);
-      issue.imageFilePaths = imageFilePaths;
+      const commentImagePaths = await downloadAndPersistCommentImages(issueIdentifier, issue.commentImageUrls ?? []);
+      issue.imageFilePaths = [...imageFilePaths, ...commentImagePaths];
       req.log.info(
         {
           identifier: issue.identifier,
@@ -98,7 +100,9 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
           descLen: issue.description.length,
           comments: issue.comments.length,
           imageCount: issue.images?.length ?? 0,
+          commentImageCount: issue.commentImageUrls?.length ?? 0,
           imageFilePaths,
+          commentImagePaths,
         },
         "issue fetched"
       );
