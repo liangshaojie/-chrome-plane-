@@ -106,10 +106,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
         break
       }
 
-      case 'usage':
-        addStep('usage', 'Token', `输入 ${ev.inputTokens ?? '-'} / 输出 ${ev.outputTokens ?? '-'}`)
-        break
-
       case 'error':
         setStatus(ev.message)
         addStep('err', '错误', ev.message, ev.message)

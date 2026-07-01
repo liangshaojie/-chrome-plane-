@@ -214,14 +214,6 @@ export async function* analyzeIssue(
             };
           }
         }
-        const u = m.message?.usage;
-        if (u) {
-          yield {
-            type: "usage",
-            inputTokens: u.input_tokens,
-            outputTokens: u.output_tokens,
-          };
-        }
       } else if (m.type === "user" && m.message?.content) {
         for (const block of m.message.content as any[]) {
           if (!block || typeof block !== "object") continue;
