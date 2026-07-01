@@ -20,12 +20,6 @@ const analysisStore = useAnalysisStore()
       分析结果
     </button>
     <button
-      :class="['tab', activeTab === 'proposal' && 'active']"
-      @click="activeTab = 'proposal'"
-    >
-      修改方案
-    </button>
-    <button
       :class="['tab', activeTab === 'review' && 'active']"
       @click="activeTab = 'review'"
     >

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { AgentEvent, IssueInfo, Step, EventKind } from '@/types/events'
 
 function truncate(str: string | null | undefined, n = 120): string {
@@ -17,12 +17,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const steps = ref<Step[]>([])
   const outputText = ref('')
   const reviewUrl = ref('')
-  const writebackText = ref('')
-  const writebackStatus = ref('')
-  const writebackStatusKind = ref<'' | 'error' | 'success'>('')
   const doneMeta = ref<{ subtype?: string; durationMs?: number; costUsd?: number; numTurns?: number } | null>(null)
-
-  const showWriteback = computed(() => phase.value === 'done' && writebackText.value.trim().length > 0)
 
   const stepByToolId = new Map<string, number>()
 
@@ -33,9 +28,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     steps.value = []
     outputText.value = ''
     reviewUrl.value = ''
-    writebackText.value = ''
-    writebackStatus.value = ''
-    writebackStatusKind.value = ''
     doneMeta.value = null
     stepByToolId.clear()
   }
@@ -51,11 +43,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   function setStatus(msg: string) {
     statusMessage.value = msg
-  }
-
-  function setWritebackStatus(msg: string, kind: '' | 'error' | 'success' = '') {
-    writebackStatus.value = msg
-    writebackStatusKind.value = kind
   }
 
   function handleEvent(ev: AgentEvent) {
@@ -126,9 +113,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
         setStatus(`完成（${parts.join(', ')}）`)
         addStep('done', '完成', parts.join(' · '))
         doneMeta.value = { subtype: ev.subtype, durationMs: ev.durationMs, costUsd: ev.costUsd, numTurns: ev.numTurns }
-        if (outputText.value.trim()) {
-          writebackText.value = outputText.value.trim()
-        }
         phase.value = 'done'
         break
       }
@@ -145,14 +129,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     steps,
     outputText,
     reviewUrl,
-    writebackText,
-    writebackStatus,
-    writebackStatusKind,
     doneMeta,
-    showWriteback,
     resetAnalysis,
     setStatus,
-    setWritebackStatus,
     handleEvent,
   }
 })
