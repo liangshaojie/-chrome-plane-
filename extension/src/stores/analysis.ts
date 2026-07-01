@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { AgentEvent, IssueInfo, Step, EventKind } from '@/types/events'
+import type { AgentEvent, IssueInfo, Step, EventKind, ChangedFile } from '@/types/events'
 
 function truncate(str: string | null | undefined, n = 120): string {
   if (!str) return ''
@@ -17,6 +17,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const steps = ref<Step[]>([])
   const outputText = ref('')
   const reviewUrl = ref('')
+  const changedFiles = ref<ChangedFile[]>([])
+  // changeAction: '' 待确认 | 'committing' 提交中 | 'reverting' 恢复中 | 'committed' 已提交 | 'reverted' 已恢复 | 'error'
+  const changeAction = ref<'' | 'committing' | 'reverting' | 'committed' | 'reverted' | 'error'>('')
+  const changeMessage = ref('')
   const doneMeta = ref<{ subtype?: string; durationMs?: number; costUsd?: number; numTurns?: number } | null>(null)
 
   const stepByToolId = new Map<string, number>()
@@ -28,6 +32,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     steps.value = []
     outputText.value = ''
     reviewUrl.value = ''
+    changedFiles.value = []
+    changeAction.value = ''
+    changeMessage.value = ''
     doneMeta.value = null
     stepByToolId.clear()
   }
@@ -100,9 +107,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
         addStep('err', '错误', ev.message, ev.message)
         break
 
-      case 'review':
-        reviewUrl.value = ev.url
-        addStep('done', 'Gerrit', '代码已提交到 Gerrit')
+      case 'changes':
+        changedFiles.value = ev.files
+        addStep('done', '代码改动', `共 ${ev.files.length} 个文件被修改，等待确认`)
         break
 
       case 'done': {
@@ -129,6 +136,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     steps,
     outputText,
     reviewUrl,
+    changedFiles,
+    changeAction,
+    changeMessage,
     doneMeta,
     resetAnalysis,
     setStatus,

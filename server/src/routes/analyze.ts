@@ -5,20 +5,69 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { promises as fs } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { fetchAnalyzableIssue } from "../plane.js";
 import { analyzeIssue } from "../agent.js";
 import { downloadAndPersistCommentImages } from "../download-comment-images.js";
 
-// 从工具结果文本里提取 gerrit review 链接
-// gerrit 推送成功后会在输出里打印形如：
-//   https://gerrit.m.local/c/web-gui/+/15703 feat: xxx [NEW]
-function extractGerritUrl(text: string): string | null {
-  if (!text) return null;
-  const re = /https?:\/\/[^\s"'<>]*\/\+\/\d+[^\s"'<>]*/g;
-  const m = text.match(re);
-  return m && m.length ? m[0] : null;
+// 代码改动文件（与前端 ChangedFile 保持一致）
+interface ChangedFile {
+  path: string;
+  additions: number;
+  deletions: number;
+  diff: string;
+}
+
+// 在 codeRoot 仓库里执行 git，合并 stdout + stderr 返回（push 的 Gerrit 链接在 stderr）
+export function runGit(args: string[], cwd: string): string {
+  const r = spawnSync("git", ["--no-pager", ...args], {
+    cwd,
+    encoding: "utf-8",
+    maxBuffer: 50 * 1024 * 1024,
+    windowsHide: true,
+  });
+  const combined = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+  if (r.status !== 0) {
+    const err = new Error(`git ${args.join(" ")} 失败（exit ${r.status}）：${combined.slice(-500)}`) as Error & {
+      stdout?: string;
+      stderr?: string;
+    };
+    err.stdout = r.stdout ?? "";
+    err.stderr = r.stderr ?? "";
+    throw err;
+  }
+  return combined;
+}
+
+// 把分析开始前的 HEAD 与当前工作区做 diff，按文件拆分
+// git diff <sha> 同时覆盖“已提交的新增提交”与“未提交改动”
+export function computeChanges(codeRoot: string, startSha: string): ChangedFile[] {
+  let full = "";
+  try {
+    full = runGit(["diff", startSha, "--no-color"], codeRoot);
+  } catch {
+    return [];
+  }
+  if (!full.trim()) return [];
+
+  return full
+    .split(/^(?=diff --git )/m)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const m = chunk.match(/^diff --git a\/(\S+) b\/(\S+)/);
+      const filePath = m ? m[2] : "(未知文件)";
+      let additions = 0;
+      let deletions = 0;
+      for (const line of chunk.split(/\r?\n/)) {
+        if (line.startsWith("+++") || line.startsWith("---")) continue;
+        if (line.startsWith("+")) additions++;
+        else if (line.startsWith("-")) deletions++;
+      }
+      return { path: filePath, additions, deletions, diff: chunk };
+    });
 }
 
 // 把前端送来的 base64 图片落盘，返回绝对路径列表
@@ -98,6 +147,17 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     try {
       req.log.info({ workspaceSlug, issueIdentifier, imageCount: images?.length ?? 0 }, "analyze start");
 
+      // 记录分析开始前的 HEAD，用于结束后计算代码改动 diff
+      const codeRoot = process.env.LOCAL_CODE_ROOT;
+      let startSha: string | null = null;
+      if (codeRoot) {
+        try {
+          startSha = runGit(["rev-parse", "HEAD"], codeRoot).trim() || null;
+        } catch (e) {
+          req.log.warn({ e }, "记录起始 HEAD 失败，跳过 diff 推送");
+        }
+      }
+
       send({ type: "status", message: "正在拉取 Plane workItem..." });
       const issue = await fetchAnalyzableIssue(workspaceSlug, issueIdentifier, images);
       // 把图片落盘，传绝对路径给 agent，让 Claude 用 MCP / Read 工具分析
@@ -130,24 +190,23 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
       send({ type: "status", message: "Claude 分析中..." });
 
       let evCount = 0;
-      let reviewUrl: string | null = null;
       for await (const ev of analyzeIssue(issue, ac.signal)) {
         evCount++;
-
-        // 从工具结果里提取 gerrit review 链接（Agent 执行 git push 后会输出）
-        if (!reviewUrl && ev.type === "tool_result" && !ev.isError) {
-          const found = extractGerritUrl(ev.content);
-          if (found) {
-            reviewUrl = found;
-            req.log.info({ reviewUrl }, "gerrit review url captured");
-            send({ type: "review", url: reviewUrl });
-          }
-        }
-
         send(ev);
         if (ac.signal.aborted) break;
       }
       req.log.info({ evCount }, "agent loop done");
+
+      // 分析结束后，把代码改动 diff 推送到前端供人工确认
+      if (codeRoot && startSha) {
+        try {
+          const files = computeChanges(codeRoot, startSha);
+          req.log.info({ changeCount: files.length }, "computed code changes");
+          if (files.length) send({ type: "changes", files });
+        } catch (e) {
+          req.log.warn({ e }, "compute changes failed");
+        }
+      }
     } catch (err: any) {
       req.log.error({ err }, "analyze route crashed");
       send({ type: "error", message: err?.message ?? String(err) });

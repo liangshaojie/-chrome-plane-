@@ -10,7 +10,7 @@ export type AgentEvent =
   | { type: 'tool_use'; id: string; name: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'usage'; inputTokens?: number; outputTokens?: number }
-  | { type: 'review'; url: string }
+  | { type: 'changes'; files: ChangedFile[] }
   | { type: 'done'; subtype: string; durationMs?: number; costUsd?: number; numTurns?: number }
   | { type: 'error'; message: string }
   | { type: 'end' }
@@ -21,6 +21,14 @@ export interface IssueInfo {
   state?: string
   labels?: string[]
   url: string
+}
+
+// Agent 修改后的代码改动文件（与服务端 analyze.ts 的 ChangedFile 保持一致）
+export interface ChangedFile {
+  path: string
+  additions: number
+  deletions: number
+  diff: string
 }
 
 export type EventKind = 'sys' | 'tool' | 'think' | 'text' | 'result' | 'usage' | 'done' | 'err'

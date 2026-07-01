@@ -20,11 +20,13 @@ const analysisStore = useAnalysisStore()
       分析结果
     </button>
     <button
-      :class="['tab', activeTab === 'review' && 'active']"
-      @click="activeTab = 'review'"
+      :class="['tab', activeTab === 'changes' && 'active']"
+      @click="activeTab = 'changes'"
     >
-      Gerrit 提交
-      <span v-if="analysisStore.reviewUrl" class="dot" />
+      代码改动
+      <span v-if="analysisStore.changedFiles.length" class="badge">
+        {{ analysisStore.changedFiles.length }}
+      </span>
     </button>
   </nav>
 </template>
@@ -64,13 +66,6 @@ const analysisStore = useAnalysisStore()
   font-size: 10px;
   font-weight: 600;
   line-height: 1;
-}
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--success);
-  display: inline-block;
 }
 .tab:hover {
   color: var(--text);

@@ -6,6 +6,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { execSync } from "child_process";
 import { registerAnalyzeRoute } from "./routes/analyze.js";
+import { registerChangesRoutes } from "./routes/changes.js";
 import { registerIssueDetailRoute } from "./routes/issue-detail.js";
 import { registerProxyImageRoute } from "./routes/proxy-image.js";
 
@@ -39,6 +40,7 @@ app.get("/health", async () => ({
  * 注册路由
  */
 await registerAnalyzeRoute(app);
+await registerChangesRoutes(app);
 await registerIssueDetailRoute(app);
 await registerProxyImageRoute(app);
 

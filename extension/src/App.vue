@@ -7,7 +7,7 @@ import StatusBar from '@/components/StatusBar.vue'
 import TabNav from '@/components/TabNav.vue'
 import ProcessLog from '@/components/ProcessLog.vue'
 import OutputPane from '@/components/OutputPane.vue'
-import ReviewPane from '@/components/ReviewPane.vue'
+import ChangesPane from '@/components/ChangesPane.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAnalysisStore } from '@/stores/analysis'
 
@@ -19,11 +19,11 @@ onMounted(() => {
   settingsStore.loadFromStorage()
 })
 
-// 收到 Gerrit 提交链接后，自动切到“Gerrit 提交”tab，方便直接查看
+// 收到代码改动后，自动切到“代码改动”tab，方便直接确认
 watch(
-  () => analysisStore.reviewUrl,
-  (url) => {
-    if (url) activeTab.value = 'review'
+  () => analysisStore.changedFiles.length,
+  (n) => {
+    if (n > 0) activeTab.value = 'changes'
   }
 )
 </script>
@@ -38,7 +38,7 @@ watch(
     <div class="pane-container">
       <ProcessLog v-show="activeTab === 'process'" />
       <OutputPane v-show="activeTab === 'result'" />
-      <ReviewPane v-show="activeTab === 'review'" />
+      <ChangesPane v-show="activeTab === 'changes'" />
     </div>
   </div>
 </template>
