@@ -10,6 +10,7 @@ export type AgentEvent =
   | { type: 'tool_use'; id: string; name: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'usage'; inputTokens?: number; outputTokens?: number }
+  | { type: 'review'; url: string }
   | { type: 'done'; subtype: string; durationMs?: number; costUsd?: number; numTurns?: number }
   | { type: 'error'; message: string }
   | { type: 'end' }

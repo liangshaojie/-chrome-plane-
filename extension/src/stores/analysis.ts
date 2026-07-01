@@ -16,6 +16,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const issue = ref<IssueInfo | null>(null)
   const steps = ref<Step[]>([])
   const outputText = ref('')
+  const reviewUrl = ref('')
   const writebackText = ref('')
   const writebackStatus = ref('')
   const writebackStatusKind = ref<'' | 'error' | 'success'>('')
@@ -31,6 +32,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     issue.value = null
     steps.value = []
     outputText.value = ''
+    reviewUrl.value = ''
     writebackText.value = ''
     writebackStatus.value = ''
     writebackStatusKind.value = ''
@@ -111,6 +113,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
         addStep('err', '错误', ev.message, ev.message)
         break
 
+      case 'review':
+        reviewUrl.value = ev.url
+        addStep('done', 'Gerrit', '代码已提交到 Gerrit')
+        break
+
       case 'done': {
         const parts: string[] = [`subtype=${ev.subtype}`]
         if (ev.numTurns != null) parts.push(`turns=${ev.numTurns}`)
@@ -137,6 +144,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     issue,
     steps,
     outputText,
+    reviewUrl,
     writebackText,
     writebackStatus,
     writebackStatusKind,

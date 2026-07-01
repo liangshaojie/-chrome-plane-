@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useAnalysisStore } from '@/stores/analysis'
+
 const activeTab = defineModel<string>({ default: 'process' })
+const analysisStore = useAnalysisStore()
 </script>
 
 <template>
@@ -22,6 +25,13 @@ const activeTab = defineModel<string>({ default: 'process' })
     >
       修改方案
     </button>
+    <button
+      :class="['tab', activeTab === 'review' && 'active']"
+      @click="activeTab = 'review'"
+    >
+      Gerrit 提交
+      <span v-if="analysisStore.reviewUrl" class="dot" />
+    </button>
   </nav>
 </template>
 
@@ -43,6 +53,30 @@ const activeTab = defineModel<string>({ default: 'process' })
   position: relative;
   transition: color 0.15s;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
 }
 .tab:hover {
   color: var(--text);

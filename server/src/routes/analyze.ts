@@ -11,6 +11,16 @@ import { fetchAnalyzableIssue } from "../plane.js";
 import { analyzeIssue } from "../agent.js";
 import { downloadAndPersistCommentImages } from "../download-comment-images.js";
 
+// 从工具结果文本里提取 gerrit review 链接
+// gerrit 推送成功后会在输出里打印形如：
+//   https://gerrit.m.local/c/web-gui/+/15703 feat: xxx [NEW]
+function extractGerritUrl(text: string): string | null {
+  if (!text) return null;
+  const re = /https?:\/\/[^\s"'<>]*\/\+\/\d+[^\s"'<>]*/g;
+  const m = text.match(re);
+  return m && m.length ? m[0] : null;
+}
+
 // 把前端送来的 base64 图片落盘，返回绝对路径列表
 async function persistImages(
   identifier: string,
@@ -87,6 +97,7 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
 
     try {
       req.log.info({ workspaceSlug, issueIdentifier, imageCount: images?.length ?? 0 }, "analyze start");
+
       send({ type: "status", message: "正在拉取 Plane workItem..." });
       const issue = await fetchAnalyzableIssue(workspaceSlug, issueIdentifier, images);
       // 把图片落盘，传绝对路径给 agent，让 Claude 用 MCP / Read 工具分析
@@ -119,8 +130,20 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
       send({ type: "status", message: "Claude 分析中..." });
 
       let evCount = 0;
+      let reviewUrl: string | null = null;
       for await (const ev of analyzeIssue(issue, ac.signal)) {
         evCount++;
+
+        // 从工具结果里提取 gerrit review 链接（Agent 执行 git push 后会输出）
+        if (!reviewUrl && ev.type === "tool_result" && !ev.isError) {
+          const found = extractGerritUrl(ev.content);
+          if (found) {
+            reviewUrl = found;
+            req.log.info({ reviewUrl }, "gerrit review url captured");
+            send({ type: "review", url: reviewUrl });
+          }
+        }
+
         send(ev);
         if (ac.signal.aborted) break;
       }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import TopBar from '@/components/TopBar.vue'
 import Controls from '@/components/Controls.vue'
 import IssueCard from '@/components/IssueCard.vue'
@@ -8,6 +8,7 @@ import TabNav from '@/components/TabNav.vue'
 import ProcessLog from '@/components/ProcessLog.vue'
 import OutputPane from '@/components/OutputPane.vue'
 import ProposalPane from '@/components/ProposalPane.vue'
+import ReviewPane from '@/components/ReviewPane.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlaneUrl } from '@/composables/usePlaneUrl'
 import { useAnalysisStore } from '@/stores/analysis'
@@ -21,6 +22,14 @@ const adoptingId = ref<string | null>(null)
 onMounted(() => {
   settingsStore.loadFromStorage()
 })
+
+// 收到 Gerrit 提交链接后，自动切到“Gerrit 提交”tab，方便直接查看
+watch(
+  () => analysisStore.reviewUrl,
+  (url) => {
+    if (url) activeTab.value = 'review'
+  }
+)
 
 async function postWriteback(path: string, content: string) {
   const url = settingsStore.serverUrl.replace(/\/$/, '')
@@ -72,6 +81,7 @@ ${proposal.content}
         v-show="activeTab === 'proposal'"
         @adopt="adoptProposal"
       />
+      <ReviewPane v-show="activeTab === 'review'" />
     </div>
     <div
       v-if="analysisStore.writebackStatus"
