@@ -11,6 +11,7 @@ import os from "node:os";
 import { fetchAnalyzableIssue } from "../plane.js";
 import { analyzeIssue } from "../agent.js";
 import { downloadAndPersistCommentImages } from "../download-comment-images.js";
+import { USER_ROLES, type UserRole } from "../prompts.js";
 
 // 代码改动文件（与前端 ChangedFile 保持一致）
 interface ChangedFile {
@@ -99,6 +100,7 @@ async function persistImages(
 const Body = z.object({
   workspaceSlug: z.string().min(1),
   issueIdentifier: z.string().regex(/^[A-Za-z0-9]+-\d+$/),
+  role: z.enum(["developer", "tester", "business"]).optional().default("developer"),
   images: z.array(z.object({
     url: z.string(),
     base64: z.string(),
@@ -116,7 +118,7 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     if (!parse.success) {
       return reply.code(400).send({ error: "参数错误", detail: parse.error.flatten() });
     }
-    const { workspaceSlug, issueIdentifier, images } = parse.data;
+    const { workspaceSlug, issueIdentifier, role, images } = parse.data;
 
     // SSE 头
     reply.raw.writeHead(200, {
@@ -145,7 +147,7 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     };
 
     try {
-      req.log.info({ workspaceSlug, issueIdentifier, imageCount: images?.length ?? 0 }, "analyze start");
+      req.log.info({ workspaceSlug, issueIdentifier, role, imageCount: images?.length ?? 0 }, "analyze start");
 
       // 记录分析开始前的 HEAD，用于结束后计算代码改动 diff
       const codeRoot = process.env.LOCAL_CODE_ROOT;
@@ -190,15 +192,16 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
       send({ type: "status", message: "Claude 分析中..." });
 
       let evCount = 0;
-      for await (const ev of analyzeIssue(issue, ac.signal)) {
+      for await (const ev of analyzeIssue(issue, ac.signal, role)) {
         evCount++;
         send(ev);
         if (ac.signal.aborted) break;
       }
-      req.log.info({ evCount }, "agent loop done");
+      req.log.info({ evCount, role }, "agent loop done");
 
       // 分析结束后，把代码改动 diff 推送到前端供人工确认
-      if (codeRoot && startSha) {
+      // 只对开发者角色推送代码改动 diff（其他角色不会修改代码）
+      if (codeRoot && startSha && role === "developer") {
         try {
           const files = computeChanges(codeRoot, startSha);
           req.log.info({ changeCount: files.length }, "computed code changes");
@@ -206,6 +209,8 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
         } catch (e) {
           req.log.warn({ e }, "compute changes failed");
         }
+      } else if (role !== "developer") {
+        req.log.info({ role }, "跳过代码改动计算（非开发者角色）");
       }
     } catch (err: any) {
       req.log.error({ err }, "analyze route crashed");

@@ -80,11 +80,11 @@ export function useSSE() {
         }
       }
 
-      // Step 3: 发送分析请求（带上图片 base64）
+      // Step 3: 发送分析请求（带上图片 base64 和角色）
       const res = await fetch(`${url}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...parsed, images }),
+        body: JSON.stringify({ ...parsed, images, role: analysisStore.role }),
         signal: abortCtrl.value.signal,
       })
 

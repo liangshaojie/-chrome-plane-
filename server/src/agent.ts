@@ -3,7 +3,7 @@
 import { query, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { AnalyzableIssue } from "./plane.js";
 import { ENABLE_SKILLS, SKILL_TOOL_ROOTS } from "./env.js";
-import { buildSystemPrompt, buildImageHint, buildSkillHint, buildCodeHint } from "./prompts.js";
+import { buildSystemPrompt, buildImageHint, buildSkillHint, buildCodeHint, getAllowedToolsForRole, type UserRole } from "./prompts.js";
 
 export type AgentEvent =
   | { type: "system"; subtype?: string; model?: string; sessionId?: string; cwd?: string; tools?: string[] }
@@ -16,7 +16,7 @@ export type AgentEvent =
   | { type: "error"; message: string };
 
 // 把 issue 拼成结构化中文 prompt
-function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
+function buildPrompt(issue: AnalyzableIssue, role: UserRole, codeRoot?: string): string {
   const commentsBlock = issue.comments.length
     ? issue.comments
         .map(
@@ -27,7 +27,7 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     : "（无评论）";
 
   // 使用抽离的提示词构建函数
-  const systemPrompt = buildSystemPrompt(codeRoot);
+  const systemPrompt = buildSystemPrompt(role, codeRoot);
   const codeHint = buildCodeHint(codeRoot);
   const skillHint = buildSkillHint();
   const imageHint = buildImageHint(issue.imageFilePaths ?? []);
@@ -58,15 +58,14 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
 
 export async function* analyzeIssue(
   issue: AnalyzableIssue,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  role: UserRole = "developer"
 ): AsyncGenerator<AgentEvent> {
   const codeRoot = process.env.LOCAL_CODE_ROOT;
-  const prompt = buildPrompt(issue, codeRoot);
+  const prompt = buildPrompt(issue, role, codeRoot);
 
-  // 基础工具 + 可选的文件操作工具
-  const baseTools = ["Skill", "Read", "Glob", "Grep", "Write", "Bash"];
-  const fileTools = codeRoot ? ["Read", "Glob", "Grep"] : [];
-  const allowedTools = [...baseTools, ...fileTools];
+  // 根据角色选择允许使用的工具
+  const allowedTools = getAllowedToolsForRole(role, !!codeRoot);
 
   console.log("\n========== [agent] analyzeIssue start ==========");
   console.log("[agent] ENABLE_SKILLS =", ENABLE_SKILLS);

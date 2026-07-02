@@ -2,6 +2,20 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgentEvent, IssueInfo, Step, EventKind, ChangedFile } from '@/types/events'
 
+/**
+ * 用户角色类型 - 与后端 prompts.ts 中的 UserRole 保持一致
+ * - developer: 开发者 - 修改代码并提交
+ * - tester: 测试人员 - 设计测试场景和用例覆盖
+ * - business: 业务人员 - 用通俗语言描述问题
+ */
+export type UserRole = 'developer' | 'tester' | 'business'
+
+export const USER_ROLES: { value: UserRole; label: string; icon: string }[] = [
+  { value: 'developer', label: '开发者', icon: '💻' },
+  { value: 'tester', label: '测试人员', icon: '🧪' },
+  { value: 'business', label: '业务人员', icon: '👔' },
+]
+
 function truncate(str: string | null | undefined, n = 120): string {
   if (!str) return ''
   const one = String(str).replace(/\s+/g, ' ').trim()
@@ -22,6 +36,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const changeAction = ref<'' | 'committing' | 'reverting' | 'committed' | 'reverted' | 'error'>('')
   const changeMessage = ref('')
   const doneMeta = ref<{ subtype?: string; durationMs?: number; costUsd?: number; numTurns?: number } | null>(null)
+  // 当前用户角色
+  const role = ref<UserRole>('developer')
 
   const stepByToolId = new Map<string, number>()
 
@@ -129,6 +145,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
+  function setRole(newRole: UserRole) {
+    role.value = newRole
+  }
+
   return {
     phase,
     statusMessage,
@@ -140,6 +160,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     changeAction,
     changeMessage,
     doneMeta,
+    role,
+    setRole,
     resetAnalysis,
     setStatus,
     handleEvent,
