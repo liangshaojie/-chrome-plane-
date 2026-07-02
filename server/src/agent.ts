@@ -2,7 +2,7 @@
 // 通过 query() 流式产出分析结果。
 import { query, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { AnalyzableIssue } from "./plane.js";
-import { ENABLE_SKILLS, SKILL_TOOL_ROOTS } from "./env.js";
+import { ENABLE_SKILLS, SKILL_TOOL_ROOTS, LOCAL_CODE_ROOT } from "./env.js";
 
 export type AgentEvent =
   | { type: "system"; subtype?: string; model?: string; sessionId?: string; cwd?: string; tools?: string[] }
@@ -56,7 +56,7 @@ function buildPrompt(issue: AnalyzableIssue, codeRoot?: string): string {
     "注意：分析、思考、回复全部使用中文输出。",
     "注意：本项目中不包含、也不维护 e2e 测试，请不要考虑或建议任何与 e2e 相关的方案、改动或验证。",
     "",
-    "【项目范围】这是一个大型 monorepo 仓库，包含多个子项目/app。",
+    `【项目范围】代码根目录为 ${LOCAL_CODE_ROOT ?? "未配置"}，这是一个大型 monorepo 仓库，包含多个子项目/app。`,
     "- 请先根据工作项的标题、描述、评论判断它属于哪个子项目（通常是某个 app 下的一个目录）。",
     "- 几乎不存在跨子项目的改动，绝大多数改动都集中在这个单一的子目录内。",
     "- 因此定位与改动代码时，请先把范围锁定到该子目录，所有的 Grep/Read/搜索和代码修改都尽量只在该目录内进行，不要漫无目的地在整个 monorepo 里搜索或改动。",

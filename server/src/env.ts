@@ -8,3 +8,4 @@ export const ENABLE_SKILLS = process.env.ENABLE_SKILLS === "true";
 export const SKILL_TOOL_ROOTS = (process.env.SKILL_TOOL_ROOTS || "~/.claude/skills")
   .split(",")
   .map((p) => p.trim());
+export const LOCAL_CODE_ROOT = process.env.LOCAL_CODE_ROOT;
