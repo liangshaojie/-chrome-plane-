@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAnalysisStore, USER_ROLES } from '@/stores/analysis'
 import { usePlaneUrl } from '@/composables/usePlaneUrl'
@@ -10,6 +11,9 @@ const analysisStore = useAnalysisStore()
 const { parsedUrl } = usePlaneUrl()
 const { isAnalyzing, startAnalysis, stopAnalysis } = useSSE()
 
+// 隐藏『开发者』角色，仅对外提供测试人员/业务人员两档
+const visibleRoles = computed(() => USER_ROLES.filter((r) => r.value !== 'developer'))
+
 watch(() => settingsStore.serverUrl, () => {
   settingsStore.saveToStorage()
 })
@@ -19,7 +23,7 @@ watch(() => settingsStore.serverUrl, () => {
   <div class="controls">
     <div class="role-selector" role="radiogroup" aria-label="选择角色">
       <button
-        v-for="r in USER_ROLES"
+        v-for="r in visibleRoles"
         :key="r.value"
         class="role-btn"
         :class="{ active: analysisStore.role === r.value }"
