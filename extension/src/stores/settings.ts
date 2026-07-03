@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const serverUrl = ref('http://10.10.10.67:8787')
+  // 默认不写死任何 IP，由 Controls.vue 的 placeholder 提示用户填入 http://<server-ip>:8787
+  const serverUrl = ref('')
 
   async function loadFromStorage() {
     if (!chrome?.storage?.local) return

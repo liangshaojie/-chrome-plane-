@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
+import { ensureOriginPermission } from '@/utils/permissions'
 import type { AgentEvent } from '@/types/events'
 
 export interface ParsedPlaneUrl {
@@ -44,6 +45,13 @@ export function useSSE() {
     const url = serverUrl.replace(/\/$/, '')
     if (!url) {
       analysisStore.setStatus('请填写后端地址')
+      return
+    }
+
+    // 远端后端：申请 host 权限（命中 manifest optional_host_permissions 时会有 Chrome 弹窗）
+    const granted = await ensureOriginPermission(url)
+    if (!granted) {
+      analysisStore.setStatus('未授权访问该后端地址，请重试并在 Chrome 弹窗中允许')
       return
     }
 

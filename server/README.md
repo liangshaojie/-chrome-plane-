@@ -11,7 +11,7 @@ pnpm install          # 或 npm install / yarn
 pnpm dev              # tsx watch src/index.ts
 ```
 
-默认监听 `http://10.10.10.67:8787`。
+默认监听 `0.0.0.0:8787`（接受所有网卡/局域网访问；可用 `HOST` 环境变量改成具体 IP，如 `HOST=192.168.1.10`）。
 
 ## 接口
 

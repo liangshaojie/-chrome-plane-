@@ -7,9 +7,10 @@
   "host_permissions": [
     "https://*.plane.so/*",
     "https://*.max-optics.com/*",
-    "http://10.10.10.67:8787/*",
-    "http://10.10.10.67:8787/*",
     "http://localhost:8787/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js"

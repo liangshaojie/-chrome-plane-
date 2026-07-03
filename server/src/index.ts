@@ -47,8 +47,9 @@ await registerProxyImageRoute(app);
 /**
  * 启动服务器
  */
+// 默认绑 0.0.0.0，适配多个开发机不同 IP 的场景；调用方则用 localhost/<本机 IP>/<远程 IP> 连接都可以。
 const port = Number(process.env.PORT ?? 8787);
-const host = process.env.HOST ?? "10.10.10.67";
+const host = process.env.HOST ?? "0.0.0.0";
 app
   .listen({ host, port })
   .then(() => {

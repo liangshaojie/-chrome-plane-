@@ -32,4 +32,4 @@ Chrome 扩展 (Side Panel)  ──HTTP/SSE──►  本地 Node 服务 (Fastify
 
 - **事件契约**：扩展的 [events.ts](../extension/src/types/events.ts) 必须与后端 [agent.ts](../server/src/agent.ts) + `/analyze` 路由的事件保持一致，改动一端需同步另一端。
 - **环境变量加载顺序**：后端 [index.ts](../server/src/index.ts) 第一行必须 `import "./env.js"`，新模块读 env 请包成函数（见 [env.ts](../server/src/env.ts) 注释）。
-- **默认地址**：`http://10.10.10.67:8787`（`HOST`/`PORT` 可配）。
+- **默认地址**：`http://0.0.0.0:8787`（`HOST`/`PORT` 可配）。Server 默认接收所有网卡请求，扩展侧在 Side Panel 输入框里填入 `http://<server-ip>:8787` 即可访问；跨机访问靠 manifest 的 `optional_host_permissions` 在首次运行时弹窗授权。
