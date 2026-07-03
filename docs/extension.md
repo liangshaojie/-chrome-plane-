@@ -46,7 +46,7 @@ extension/
 ## 2. Manifest 关键配置  · [manifest.json](extension/manifest.json)
 
 - **权限**：`sidePanel`、`activeTab`、`tabs`、`storage`、`cookies`
-- **host_permissions**：`*.plane.so`、`*.max-optics.com`、本地后端 `http://10.10.10.62:8787`、`localhost:8787`
+- **host_permissions**：`*.plane.so`、`*.max-optics.com`、本地后端 `http://10.10.10.67:8787`、`localhost:8787`
 - **background**：`background.js`（Service Worker）
 - **content_scripts**：注入 `*.plane.so` / `*.max-optics.com`（`document_idle`）
 - **side_panel**：`default_path: sidepanel.html`
@@ -112,7 +112,7 @@ body: { workspaceSlug, issueIdentifier, content }
 
 ## 5. 设置持久化  · [settings.ts](extension/src/stores/settings.ts)
 
-`serverUrl` 默认 `http://10.10.10.62:8787`，存 `chrome.storage.local`。[Controls.vue](extension/src/components/Controls.vue) `watch(serverUrl)` 自动保存。
+`serverUrl` 默认 `http://10.10.10.67:8787`，存 `chrome.storage.local`。[Controls.vue](extension/src/components/Controls.vue) `watch(serverUrl)` 自动保存。
 
 ---
 
@@ -144,6 +144,6 @@ pnpm build     # vue-tsc 类型检查 + vite build -> dist/
 ## 8. 已知约定 / 注意事项
 
 - `content-script.js` 的 DOM 内下载（带 cookie 的 fetch）目前**未在主流程使用**——图片改走服务端 `/proxy-image`（Playwright 代下，更可靠）。保留 content script 作为可选回退。
-- `host_permissions` 中 `10.10.10.62:8787` 出现两次（重复条目），无害但可清理。
+- `host_permissions` 中 `10.10.10.67:8787` 出现两次（重复条目），无害但可清理。
 - `useSSE` 未对 serverUrl 做协议/格式校验，仅去尾斜杠。
 - Markdown 渲染依赖 `marked`（[package.json](extension/package.json#L13)），见 OutputPane 渲染 `outputText`。

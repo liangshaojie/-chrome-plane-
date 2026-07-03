@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["html"], ["list"]],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://10.10.10.62:8787",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://10.10.10.67:8787",
     trace: "on-first-retry",
   },
   projects: [

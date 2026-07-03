@@ -48,7 +48,7 @@ await registerProxyImageRoute(app);
  * 启动服务器
  */
 const port = Number(process.env.PORT ?? 8787);
-const host = process.env.HOST ?? "10.10.10.62";
+const host = process.env.HOST ?? "10.10.10.67";
 app
   .listen({ host, port })
   .then(() => {
