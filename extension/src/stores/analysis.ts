@@ -36,8 +36,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const changeAction = ref<'' | 'committing' | 'reverting' | 'committed' | 'reverted' | 'error'>('')
   const changeMessage = ref('')
   const doneMeta = ref<{ subtype?: string; durationMs?: number; costUsd?: number; numTurns?: number } | null>(null)
-  // 当前用户角色
-  const role = ref<UserRole>('developer')
+  // 当前用户角色（默认业务人员，避免同事误选到「开发者」/代码改动入口）
+  const role = ref<UserRole>('business')
 
   const stepByToolId = new Map<string, number>()
 
