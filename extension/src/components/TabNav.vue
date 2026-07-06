@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useAnalysisStore } from '@/stores/analysis'
+
 const activeTab = defineModel<string>({ default: 'process' })
+const analysisStore = useAnalysisStore()
 </script>
 
 <template>
@@ -15,6 +18,15 @@ const activeTab = defineModel<string>({ default: 'process' })
       @click="activeTab = 'result'"
     >
       分析结果
+    </button>
+    <button
+      :class="['tab', activeTab === 'changes' && 'active']"
+      @click="activeTab = 'changes'"
+    >
+      代码改动
+      <span v-if="analysisStore.changedFiles.length" class="badge">
+        {{ analysisStore.changedFiles.length }}
+      </span>
     </button>
   </nav>
 </template>
