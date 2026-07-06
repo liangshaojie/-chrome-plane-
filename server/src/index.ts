@@ -28,6 +28,8 @@ await app.register(cors, {
  */
 app.get("/health", async () => ({
   ok: true,
+  env: process.env.NODE_ENV ?? "development",
+  host: process.env.HOST ?? "0.0.0.0",
   hasPlaneToken: Boolean(process.env.PLANE_API_TOKEN),
   hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
   hasAnthropicAuthToken: Boolean(process.env.ANTHROPIC_AUTH_TOKEN),
