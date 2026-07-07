@@ -59,15 +59,18 @@ async function callChanges(path: 'commit' | 'revert') {
   analysisStore.changeMessage = ''
 
   try {
+    const body: Record<string, unknown> = {
+      ...parsedUrl.value,
+      title: analysisStore.issue?.title,
+    }
+    // 没有对应的 history 记录（极少见，比如老数据库 / 测试脚本），就不发该字段
+    if (analysisStore.historyRecordId != null) {
+      body.historyId = analysisStore.historyRecordId
+    }
     const res = await fetch(`${url}/changes/${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...parsedUrl.value,
-        title: analysisStore.issue?.title,
-        // 告诉服务端本次操作对应哪条 history 记录，用于落库（commit_status / reverted_at）
-        historyId: analysisStore.historyRecordId,
-      }),
+      body: JSON.stringify(body),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok || !data.ok) {

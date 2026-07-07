@@ -25,7 +25,11 @@ const body = z.object({
   issueIdentifier: z.string().min(1),
   title: z.string().optional(),
   // 可选：本次操作对应的 history 记录 id，用于把 commit_status/reverted_at 持久化
-  historyId: z.number().int().positive().optional(),
+  // 兼容前端显式发 null（旧前端 / 测试脚本可能这么发），转为 undefined
+  historyId: z
+    .union([z.number().int().positive(), z.null()])
+    .optional()
+    .transform((v) => (v == null ? undefined : v)),
 });
 
 export async function registerChangesRoutes(app: FastifyInstance) {
