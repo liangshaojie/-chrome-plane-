@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useHistoryStore } from '@/stores/history'
 import { useSettingsStore } from '@/stores/settings'
 import { useAnalysisStore } from '@/stores/analysis'
@@ -15,16 +15,73 @@ const analysisStore = useAnalysisStore()
 // 二次确认删除的记录 id
 const confirmDeleteId = ref<number | null>(null)
 
-// 打开模态时拉取列表
+// live 行的「已耗时」每 500ms 刷新
+const now = ref(Date.now())
+let tickHandle: number | null = null
+function startTick() {
+  stopTick()
+  tickHandle = window.setInterval(() => (now.value = Date.now()), 500)
+}
+function stopTick() {
+  if (tickHandle != null) {
+    clearInterval(tickHandle)
+    tickHandle = null
+  }
+}
+onUnmounted(stopTick)
+
+// 打开模态时启动 tick 并拉取列表；关闭时停 tick
 watch(
   () => props.open,
   async (o) => {
     if (o) {
       confirmDeleteId.value = null
+      startTick()
       await historyStore.fetchList(settingsStore.serverUrl)
+    } else {
+      stopTick()
     }
   }
 )
+
+// live 行展示数据：当前是否有 live 快照 + UI 是否在 live 视图 + phase + 角色 + 已耗时
+const liveRow = computed(() => {
+  const ls = analysisStore.live
+  if (!ls) return null
+  const elapsed = Math.max(0, now.value - ls.startedAt)
+  const role = ls.role
+  const roleMeta = USER_ROLES.find((r) => r.value === role)
+  return {
+    isAnalyzing: ls.phase === 'analyzing',
+    isViewing: analysisStore.viewingLive,
+    role,
+    roleLabel: roleMeta?.label ?? role,
+    roleIcon: roleMeta?.icon ?? '',
+    identifier: ls.display.issue?.identifier ?? null,
+    title: ls.display.issue?.title ?? null,
+    elapsedMs: elapsed,
+    stepCount: ls.display.steps.length,
+  }
+})
+
+function fmtElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  const rs = s % 60
+  return `${m}m${rs}s`
+}
+
+// 点击 live 行：切回 live 视图 + 关模态
+function resumeLive() {
+  analysisStore.showLive()
+  close()
+}
+
+// 点击「收起」：清掉 live 快照（已落库的历史记录仍在列表里）
+function dismissLive() {
+  analysisStore.clearLive()
+}
 
 function close() {
   emit('close')
@@ -119,6 +176,43 @@ function fmtCost(c: number | null): string {
           <span class="empty-hint">分析完成的结果会自动保存到这里</span>
         </div>
         <ul v-else class="history-list">
+          <li v-if="liveRow" :class="['history-item', 'live-item', liveRow.isAnalyzing ? 'is-analyzing' : 'is-just-done', liveRow.isViewing && 'is-current-view']">
+            <button class="item-main" @click="resumeLive">
+              <div class="item-top">
+                <span :class="['live-tag', liveRow.isAnalyzing ? 'live-tag-run' : 'live-tag-done']">
+                  <span v-if="liveRow.isAnalyzing" class="live-dot"></span>
+                  {{ liveRow.isAnalyzing ? '正在分析' : '新完成' }}
+                </span>
+                <span class="item-ident">{{ liveRow.identifier ?? '（等待拉取）' }}</span>
+                <span :class="['role-chip', `role-${liveRow.role}`]">
+                  <span class="role-icon">{{ liveRow.roleIcon }}</span>
+                  {{ liveRow.roleLabel }}
+                </span>
+              </div>
+              <div class="item-title" :title="liveRow.title ?? ''">
+                {{ liveRow.title ?? '等待 Claude 拉取 issue…' }}
+              </div>
+              <div class="item-meta">
+                <span>{{ liveRow.isAnalyzing ? `已耗时 ${fmtElapsed(liveRow.elapsedMs)}` : `耗时 ${fmtElapsed(liveRow.elapsedMs)}` }}</span>
+                <span class="dot">·</span>
+                <span>{{ liveRow.stepCount }} 步</span>
+                <span v-if="liveRow.isViewing" class="dot">·</span>
+                <span v-if="liveRow.isViewing" class="current-view-tag">当前显示</span>
+                <span v-else class="resume-hint">点击切回</span>
+              </div>
+            </button>
+            <div class="item-actions">
+              <button
+                v-if="!liveRow.isAnalyzing"
+                class="del-btn"
+                title="从历史列表中移除（不会删除已落库的历史记录）"
+                @click.stop="dismissLive"
+              >
+                <span class="del-btn-icon">×</span>
+                <span>收起</span>
+              </button>
+            </div>
+          </li>
           <li v-for="r in historyStore.list" :key="r.id" class="history-item">
             <button class="item-main" @click="openRecord(r.id)">
               <div class="item-top">
@@ -164,7 +258,7 @@ function fmtCost(c: number | null): string {
 
       <div class="history-footer">
         <span v-if="analysisStore.isHistoryView" class="viewing-hint">
-          正在查看历史记录 · 点击「开始分析」即退出回看
+          正在查看历史记录 · 点击顶部「正在分析」可切回当前分析
         </span>
         <button class="btn-primary" @click="close">关闭</button>
       </div>
@@ -509,5 +603,72 @@ function fmtCost(c: number | null): string {
 }
 .btn-primary:hover {
   filter: brightness(1.08);
+}
+
+/* ---- live 行（正在分析 / 新完成） ---- */
+.live-item {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0.08) 0%,
+    var(--bg) 60%
+  );
+}
+.live-item.is-just-done {
+  border-color: rgba(104, 211, 145, 0.45);
+  background: linear-gradient(
+    90deg,
+    rgba(104, 211, 145, 0.08) 0%,
+    var(--bg) 60%
+  );
+}
+.live-item.is-current-view {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.2px;
+}
+.live-tag-run {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+.live-tag-done {
+  background: rgba(104, 211, 145, 0.18);
+  color: var(--success, #68d3a0);
+  border: 1px solid rgba(104, 211, 145, 0.4);
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #60a5fa;
+  box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7);
+  animation: live-pulse 1.2s ease-out infinite;
+}
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(96, 165, 250, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+  }
+}
+.current-view-tag {
+  color: var(--primary);
+  font-weight: 600;
+}
+.resume-hint {
+  color: var(--primary);
 }
 </style>

@@ -55,10 +55,10 @@ export function useSSE() {
       return
     }
 
-    analysisStore.resetAnalysis()
+    // 建立 live 快照，UI 切到 live 视图（即便用户在看历史也会被拉回来）
+    analysisStore.beginLive(analysisStore.role)
     analysisStore.setStatus('连接后端…')
     isAnalyzing.value = true
-    analysisStore.phase = 'analyzing'
 
     abortCtrl.value = new AbortController()
 
@@ -138,6 +138,8 @@ export function useSSE() {
     } finally {
       isAnalyzing.value = false
       abortCtrl.value = null
+      // 标记 live 快照为结束态（UI 上还能看到「新完成」+ 持续累积的事件已全部落库）
+      analysisStore.endLive()
     }
   }
 
