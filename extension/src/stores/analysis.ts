@@ -198,16 +198,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
     return ++stepIdCounter
   }
 
-  /** 把任意 DisplayState 同步到 UI 的 ref */
+  /** 把任意 DisplayState 同步到 UI 的 ref（数组/对象深拷贝，避免后续写入污染源） */
   function paintDisplay(ds: DisplayState) {
     phase.value = ds.phase
     statusMessage.value = ds.statusMessage
-    issue.value = ds.issue
-    steps.value = ds.steps
+    issue.value = ds.issue ? { ...ds.issue } : null
+    steps.value = ds.steps.map((s) => ({ ...s }))
     outputText.value = ds.outputText
     reviewUrl.value = ds.reviewUrl
-    changedFiles.value = ds.changedFiles
-    doneMeta.value = ds.doneMeta
+    changedFiles.value = ds.changedFiles.map((f) => ({ ...f }))
+    doneMeta.value = ds.doneMeta ? { ...ds.doneMeta } : null
   }
 
   function clearUiStepMap() {
@@ -257,17 +257,17 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
 
     // 2) UI 就在 live 视图 → 同步渲染到 UI refs
-    //    用一个临时 DisplayState，让 applyEventToDisplay 写入，然后 paint 回去。
-    //    注意：步骤的 stepByToolId 用 UI 端的（独立于 live 的）。
+    //    注意：ds 必须用独立的数组/对象，不能直接持有 live.display / UI refs 的引用，
+    //    否则 applyEventToDisplay 写入 ds.steps 时会同时改到 live 数组，导致重复渲染。
     const ds: DisplayState = {
       phase: phase.value,
       statusMessage: statusMessage.value,
       issue: issue.value,
-      steps: steps.value,
+      steps: [...steps.value],
       outputText: outputText.value,
       reviewUrl: reviewUrl.value,
-      changedFiles: changedFiles.value,
-      doneMeta: doneMeta.value,
+      changedFiles: [...changedFiles.value],
+      doneMeta: doneMeta.value ? { ...doneMeta.value } : null,
     }
     applyEventToDisplay(ds, ev, { stepByToolId, nextStepId })
     paintDisplay(ds)
