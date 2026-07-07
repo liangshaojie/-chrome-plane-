@@ -320,15 +320,30 @@ export async function fetchAnalyzableIssue(
 }
 
 // 把 Markdown 简单转 HTML：Plane 的 description_html / comment_html 接受 HTML。
-// 这里只做最小实现：把换行转 <br>、代码块/列表保持原文包在 <pre>/<p> 里。
+// 实现策略：
+// - 整段当作"紧凑文本"：保留原始换行（→ 单个 <br/>），不再用 <p> 强制分段（Plane 默认 <p> margin 很大，评论显得稀疏）
+// - 链接 [text](url) 转成 <a target="_blank">；行内 **bold** 转 <strong>
+// - 行内 HTML 先转义，再做上面两类替换（不会被注入）
 function markdownToHtml(md: string): string {
-  // 非常简化：按段落切分；段落内换行转 <br>；已有 HTML 标记则原样保留
-  const escaped = md
+  // 1) 转义 HTML 特殊字符
+  let s = md
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  const blocks = escaped.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-  return blocks.map((b) => `<p>${b.replace(/\n/g, "<br/>")}</p>`).join("\n");
+
+  // 2) 链接 [text](url) → <a>（链接中 url 仍含 & 等，先转义后再插入 HTML，故放在第 3 步前）
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, text, url) => {
+    // url 之前已经被 & 转义成 &amp;，这里直接拼到 href 即可
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  });
+
+  // 3) 行内加粗 **text** → <strong>（不在 <a> 内时才匹配，避免误伤）
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  // 4) 把单个 \n 转 <br/>；末尾的 \n 去掉
+  s = s.replace(/\r?\n/g, "<br/>");
+
+  return s.trim();
 }
 
 // 更新 issue 描述（支持 markdown / html）

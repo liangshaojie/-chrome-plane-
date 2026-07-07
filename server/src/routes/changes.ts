@@ -68,10 +68,12 @@ export async function registerChangesRoutes(app: FastifyInstance) {
       let commentPosted = false;
       let commentError: string | null = null;
       try {
-        const body =
-          `🤖 **本次修改由 AI 自动完成**（Plane WorkItem Analyzer）\n\n` +
-          (reviewUrl ? `🔗 Review: ${reviewUrl}\n\n` : "") +
-          `可按此标记筛选/统计 AI 完成的改动。`;
+        const lines = [
+          `🤖 **本次修改由 AI 自动完成**（Plane WorkItem Analyzer）`,
+        ];
+        if (reviewUrl) lines.push(`🔗 Review: [${reviewUrl}](${reviewUrl})`);
+        lines.push(`可按此标记筛选/统计 AI 完成的改动。`);
+        const body = lines.join("\n");
         await createIssueComment(parse.data.workspaceSlug, parse.data.issueIdentifier, body);
         commentPosted = true;
         req.log.info({ issueIdentifier: parse.data.issueIdentifier, reviewUrl }, "plane comment posted");
