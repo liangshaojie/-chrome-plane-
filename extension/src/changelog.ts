@@ -7,7 +7,7 @@
  *  3. TopBar 顶栏右侧版本号会读取 APP_VERSION，点击弹框读取 CHANGELOG
  */
 
-export const APP_VERSION = '0.4.0'
+export const APP_VERSION = '0.5.0'
 
 export interface ChangelogEntry {
   /** 版本号，遵循 semver */
@@ -24,6 +24,17 @@ export interface ChangelogEntry {
  * 当前条目（0.4.0）的 items 会同步渲染到"分析结果 tab"无结果时也会展示。
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.0',
+    date: '2026-07-07',
+    items: [
+      '新增：分析历史记录功能 —— 每次分析自动落库到本地 SQLite，TopBar「历史」入口可查看/回看/删除',
+      '回看时完整还原当时的全过程（过程步骤 + 结果正文 + 代码改动），数据存服务端，刷新 Side Panel 不丢',
+      '历史列表展示 issue 标识/标题/角色/状态/相对时间/耗时/成本/轮数，支持二次确认删除',
+      '服务端新增 SQLite 持久化（better-sqlite3，WAL 模式）+ 历史接口（GET /history 列表 / GET /history/:id 详情 / DELETE 删除）',
+      '远端后端的历史接口同样走 host 权限授权，与 analyze 流程一致',
+    ],
+  },
   {
     version: '0.4.0',
     date: '2026-07-03',

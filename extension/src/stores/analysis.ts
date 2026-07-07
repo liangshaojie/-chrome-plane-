@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { AgentEvent, IssueInfo, Step, EventKind, ChangedFile } from '@/types/events'
+import type { AgentEvent, IssueInfo, Step, EventKind, ChangedFile, HistoryRecord } from '@/types/events'
 
 /**
  * 用户角色类型 - 与后端 prompts.ts 中的 UserRole 保持一致
@@ -38,6 +38,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const doneMeta = ref<{ subtype?: string; durationMs?: number; costUsd?: number; numTurns?: number } | null>(null)
   // 当前用户角色（默认业务人员，避免同事误选到「开发者」/代码改动入口）
   const role = ref<UserRole>('business')
+  // 是否正在查看历史记录（true 时提示“历史模式”，开始新分析会自动退出）
+  const isHistoryView = ref(false)
 
   const stepByToolId = new Map<string, number>()
 
@@ -53,6 +55,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     changeMessage.value = ''
     doneMeta.value = null
     stepByToolId.clear()
+    isHistoryView.value = false
   }
 
   function addStep(kind: EventKind, badge: string, title: string, body = '', toolUseId?: string, isError = false): number {
@@ -149,6 +152,20 @@ export const useAnalysisStore = defineStore('analysis', () => {
     role.value = newRole
   }
 
+  // 加载一条历史记录：重放事件流还原 steps/结果/改动，并标记为历史视图
+  function loadHistoryRecord(record: HistoryRecord) {
+    resetAnalysis()
+    for (const ev of record.events) handleEvent(ev)
+    // 兜底：事件流缺 text/changes 时用详情字段补
+    if (!outputText.value && record.output_text) outputText.value = record.output_text
+    if (changedFiles.value.length === 0 && record.changed_files?.length) {
+      changedFiles.value = record.changed_files
+    }
+    phase.value = record.status === 'error' ? 'error' : 'done'
+    isHistoryView.value = true
+    setStatus(`历史记录 · ${record.issue_identifier ?? issue.value?.identifier ?? ''}`)
+  }
+
   return {
     phase,
     statusMessage,
@@ -161,7 +178,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     changeMessage,
     doneMeta,
     role,
+    isHistoryView,
     setRole,
+    loadHistoryRecord,
     resetAnalysis,
     setStatus,
     handleEvent,

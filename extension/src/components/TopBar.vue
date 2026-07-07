@@ -3,11 +3,13 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { usePlaneUrl } from '@/composables/usePlaneUrl'
 import { useAnalysisStore } from '@/stores/analysis'
 import { APP_VERSION, CHANGELOG } from '@/changelog'
+import HistoryPanel from './HistoryPanel.vue'
 
 const { metaText } = usePlaneUrl()
 const analysisStore = useAnalysisStore()
 
 const showChangelog = ref(false)
+const showHistory = ref(false)
 
 function openChangelog() {
   showChangelog.value = true
@@ -15,8 +17,16 @@ function openChangelog() {
 function closeChangelog() {
   showChangelog.value = false
 }
+function openHistory() {
+  showHistory.value = true
+}
+function closeHistory() {
+  showHistory.value = false
+}
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && showChangelog.value) closeChangelog()
+  if (e.key !== 'Escape') return
+  if (showChangelog.value) closeChangelog()
+  else if (showHistory.value) closeHistory()
 }
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
@@ -28,10 +38,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <div class="logo">P</div>
       <div class="topbar-titles">
         <span class="title">Plane WorkItem Analyzer</span>
-        <span class="meta">{{ analysisStore.issue ? `${analysisStore.issue.identifier} · ${analysisStore.issue.title}` : metaText }}</span>
+        <span class="meta">
+          <span v-if="analysisStore.isHistoryView" class="history-tag" title="正在查看历史记录">历史</span>
+          {{ analysisStore.issue ? `${analysisStore.issue.identifier} · ${analysisStore.issue.title}` : metaText }}
+        </span>
       </div>
     </div>
     <div class="topbar-right">
+      <button class="history-btn" title="查看历史分析记录" @click="openHistory">
+        <span class="icon">📜</span>
+        <span class="label">历史</span>
+      </button>
       <button
         class="version-btn"
         :title="`查看更新日志（v${APP_VERSION}）`"
@@ -80,6 +97,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </div>
     </div>
   </div>
+
+  <!-- 历史分析记录弹框 -->
+  <HistoryPanel :open="showHistory" @close="closeHistory" />
 </template>
 
 <style scoped>
@@ -152,6 +172,39 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
+}
+.history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.history-btn:hover {
+  background: var(--primary-bg, rgba(59, 130, 246, 0.12));
+  color: var(--primary);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.history-btn .icon {
+  font-size: 12px;
+}
+.history-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--primary-bg, rgba(59, 130, 246, 0.15));
+  color: var(--primary);
+  margin-right: 4px;
+  vertical-align: 1px;
 }
 .version-btn:hover {
   background: var(--primary-bg, rgba(59, 130, 246, 0.12));

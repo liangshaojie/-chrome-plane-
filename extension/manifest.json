@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Plane WorkItem Analyzer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "用 Claude Agent SDK 分析 Plane 工作项（Bug / 需求）",
   "permissions": ["sidePanel", "activeTab", "tabs", "storage", "cookies"],
   "host_permissions": [

@@ -13,6 +13,7 @@ export type AgentEvent =
   | { type: 'changes'; files: ChangedFile[] }
   | { type: 'done'; subtype: string; durationMs?: number; costUsd?: number; numTurns?: number }
   | { type: 'error'; message: string }
+  | { type: 'saved'; id: number }
   | { type: 'end' }
 
 export interface IssueInfo {
@@ -42,4 +43,29 @@ export interface Step {
   isOpen: boolean
   toolUseId?: string
   isError?: boolean
+}
+
+// 历史记录摘要（GET /history 列表项；字段与后端 API 一致，保持 snake_case）
+export interface HistorySummary {
+  id: number
+  created_at: string
+  workspace_slug: string | null
+  issue_identifier: string | null
+  issue_title: string | null
+  issue_url: string | null
+  issue_state: string | null
+  role: string | null
+  status: string
+  model: string | null
+  duration_ms: number | null
+  cost_usd: number | null
+  num_turns: number | null
+  review_url: string | null
+}
+
+// 历史记录详情（GET /history/:id）；events 为当时的完整事件流，可重新喂给 handleEvent 还原界面
+export interface HistoryRecord extends HistorySummary {
+  output_text: string
+  events: AgentEvent[]
+  changed_files: ChangedFile[]
 }

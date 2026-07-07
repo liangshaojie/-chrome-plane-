@@ -9,6 +9,7 @@ import { registerAnalyzeRoute } from "./routes/analyze.js";
 import { registerChangesRoutes } from "./routes/changes.js";
 import { registerIssueDetailRoute } from "./routes/issue-detail.js";
 import { registerProxyImageRoute } from "./routes/proxy-image.js";
+import { registerHistoryRoutes } from "./routes/history.js";
 
 // Fix: Windows 终端中文乱码，设置代码页为 UTF-8
 if (process.platform === "win32") {
@@ -45,6 +46,7 @@ await registerAnalyzeRoute(app);
 await registerChangesRoutes(app);
 await registerIssueDetailRoute(app);
 await registerProxyImageRoute(app);
+await registerHistoryRoutes(app);
 
 /**
  * 启动服务器

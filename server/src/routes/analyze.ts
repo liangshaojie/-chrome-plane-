@@ -12,6 +12,7 @@ import { fetchAnalyzableIssue } from "../plane.js";
 import { analyzeIssue } from "../agent.js";
 import { downloadAndPersistCommentImages } from "../download-comment-images.js";
 import { USER_ROLES, type UserRole } from "../prompts.js";
+import { insertAnalysis } from "../db.js";
 
 // 代码改动文件（与前端 ChangedFile 保持一致）
 interface ChangedFile {
@@ -109,6 +110,48 @@ const Body = z.object({
 });
 
 /**
+ * 把一次分析的事件流落库为一条历史记录，返回自增 id；事件为空则不落库。
+ */
+function persistAnalysis(
+  events: any[],
+  meta: { workspaceSlug: string; issueIdentifier: string; role: UserRole }
+): number | null {
+  if (!events.length) return null;
+  const outputText = events
+    .filter((e) => e.type === "text")
+    .map((e: any) => e.text ?? "")
+    .join("");
+  const changesEv = events.find((e) => e.type === "changes") as any;
+  const doneEv = events.find((e) => e.type === "done") as any;
+  const issueEv = events.find((e) => e.type === "issue") as any;
+  const sysEv = events.find((e) => e.type === "system") as any;
+  const status = doneEv
+    ? "done"
+    : events.some((e) => e.type === "error")
+      ? "error"
+      : "aborted";
+
+  return insertAnalysis({
+    created_at: new Date().toISOString(),
+    workspace_slug: meta.workspaceSlug,
+    issue_identifier: issueEv?.issue?.identifier ?? meta.issueIdentifier,
+    issue_title: issueEv?.issue?.title ?? null,
+    issue_url: issueEv?.issue?.url ?? null,
+    issue_state: issueEv?.issue?.state ?? null,
+    role: meta.role,
+    status,
+    model: sysEv?.model ?? null,
+    duration_ms: doneEv?.durationMs ?? null,
+    cost_usd: doneEv?.costUsd ?? null,
+    num_turns: doneEv?.numTurns ?? null,
+    output_text: outputText || null,
+    events_json: JSON.stringify(events),
+    changed_files_json: changesEv ? JSON.stringify(changesEv.files ?? []) : null,
+    review_url: null,
+  });
+}
+
+/**
  * 注册分析路由
  * @param app
  */
@@ -129,8 +172,11 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     });
 
     const ac = new AbortController();
+    // 累积本次分析的完整事件流，结束后派生字段落库为历史记录
+    const events: any[] = [];
 
     const send = (event: any): boolean => {
+      events.push(event);
       if (reply.raw.destroyed) {
         if (!ac.signal.aborted) ac.abort();
         return false;
@@ -217,6 +263,13 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
       send({ type: "error", message: err?.message ?? String(err) });
     } finally {
       send({ type: "end" });
+      // 从累积的事件流派生全部字段，落库为一条历史记录（落库失败不影响已返回的分析结果）
+      try {
+        const recordId = persistAnalysis(events, { workspaceSlug, issueIdentifier, role });
+        if (recordId != null) send({ type: "saved", id: recordId });
+      } catch (e) {
+        req.log.warn({ e }, "persist analysis failed");
+      }
       reply.raw.end();
     }
   });

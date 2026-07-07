@@ -3,5 +3,8 @@ dist/
 .env
 .env.*
 !.env.example
+
+# SQLite 数据文件（含历史分析记录，本地生成）
+data/
 *.log
 .DS_Store
