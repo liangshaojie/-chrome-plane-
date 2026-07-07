@@ -68,7 +68,14 @@ async function callChanges(path: 'commit' | 'revert') {
     if (path === 'commit') {
       analysisStore.changeAction = 'committed'
       analysisStore.reviewUrl = data.reviewUrl || ''
-      analysisStore.changeMessage = data.reviewUrl ? '已提交到 Gerrit' : '已提交（未解析到 review 链接）'
+      const reviewMsg = data.reviewUrl ? '已提交到 Gerrit' : '已提交（未解析到 review 链接）'
+      if (data.commentPosted) {
+        analysisStore.changeMessage = `${reviewMsg} · 已在 Plane 留评论（AI 标识）`
+      } else if (data.commentError) {
+        analysisStore.changeMessage = `${reviewMsg} · Plane 评论失败：${data.commentError}`
+      } else {
+        analysisStore.changeMessage = reviewMsg
+      }
     } else {
       analysisStore.changeAction = 'reverted'
       analysisStore.changeMessage = '已恢复，代码改动已撤销'
