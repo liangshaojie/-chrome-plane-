@@ -136,7 +136,7 @@ server/
 ### 5.2 query() 调用
 - `settingSources: ["user","project"]` —— 继承用户的 Claude Code MCP / 设置
 - `permissionMode: "bypassPermissions"` + `allowDangerouslySkipPermissions: true` —— 避免 MCP 工具被权限弹窗拦截
-- `maxTurns: 20`
+- `maxTurns: 100`
 - **注入 MiniMax MCP**（`uvx minimax-coding-plan-mcp`），让 Agent 能调用图像理解等工具
 - `additionalDirectories`：`codeRoot` + 硬编码的 `C:\mo-project\web-gui`
 - `allowedTools` 定义了但实际未硬限制（注释说明让 Claude 自由调用所有工具）

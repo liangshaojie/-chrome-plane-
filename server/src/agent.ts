@@ -115,7 +115,7 @@ export async function* analyzeIssue(
         settingSources: ["user", "project"],
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
-        maxTurns: 40,
+        maxTurns: 100,
         mcpServers,
         additionalDirectories,
       },

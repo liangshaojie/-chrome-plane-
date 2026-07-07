@@ -47,6 +47,12 @@ function roleLabel(r: string | null): string {
   return found ? found.label : r
 }
 
+function roleIcon(r: string | null): string {
+  if (!r) return ''
+  const found = USER_ROLES.find((x) => x.value === (r as UserRole))
+  return found ? found.icon : ''
+}
+
 function statusText(s: string): string {
   return ({ done: '完成', error: '出错', aborted: '中断' } as Record<string, string>)[s] ?? s
 }
@@ -124,8 +130,10 @@ function fmtCost(c: number | null): string {
               </div>
               <div class="item-meta">
                 <span>{{ relTime(r.created_at) }}</span>
-                <span v-if="r.role" class="dot">·</span>
-                <span v-if="r.role">{{ roleLabel(r.role) }}</span>
+                <span v-if="r.role" :class="['role-chip', `role-${r.role}`]">
+                  <span class="role-icon">{{ roleIcon(r.role) }}</span>
+                  {{ roleLabel(r.role) }}
+                </span>
                 <span v-if="r.duration_ms != null" class="dot">·</span>
                 <span v-if="r.duration_ms != null">{{ fmtDuration(r.duration_ms) }}</span>
                 <span v-if="r.cost_usd != null" class="dot">·</span>
@@ -138,10 +146,11 @@ function fmtCost(c: number | null): string {
               <template v-if="confirmDeleteId !== r.id">
                 <button
                   class="del-btn"
-                  title="删除"
+                  title="删除这条历史记录"
                   @click.stop="confirmDeleteId = r.id"
                 >
-                  🗑
+                  <span class="del-btn-icon">🗑</span>
+                  <span>删除</span>
                 </button>
               </template>
               <template v-else>
@@ -379,49 +388,98 @@ function fmtCost(c: number | null): string {
   opacity: 0.5;
   margin: 0 1px;
 }
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 0 4px;
+  border: 1px solid transparent;
+  line-height: 1.5;
+}
+.role-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+.role-developer {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+.role-tester {
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+.role-business {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
 
 .item-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px 8px 8px 0;
+  gap: 6px;
+  padding: 8px 10px 8px 0;
   flex-shrink: 0;
 }
 .del-btn {
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 5px;
-  opacity: 0.55;
-  transition: opacity 0.15s, background 0.15s;
-}
-.del-btn:hover {
-  opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(248, 113, 113, 0.12);
-}
-.del-confirm {
-  padding: 4px 8px;
-  border: 1px solid #f87171;
-  background: rgba(248, 113, 113, 0.15);
   color: #f87171;
   font-size: 11px;
-  border-radius: 5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.del-btn:hover {
+  background: rgba(248, 113, 113, 0.22);
+  border-color: #f87171;
+}
+.del-btn-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+.del-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid #f87171;
+  background: #f87171;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
   cursor: pointer;
 }
 .del-confirm:hover {
-  background: #f87171;
-  color: #fff;
+  background: #ef4444;
+  border-color: #ef4444;
 }
 .del-cancel {
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text-muted);
   font-size: 11px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
+}
+.del-cancel:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 .history-footer {
