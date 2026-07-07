@@ -147,7 +147,7 @@ export function applyEventToDisplay(
 
     case 'end':
     case 'saved':
-      // 纯结构性事件，不影响 UI 展示
+      // 纯结构性事件，不影响 UI 展示（'saved' 仅在 store.handleEvent 里读取填进 historyRecordId）
       break
   }
 }
@@ -185,6 +185,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const role = ref<UserRole>('business')
   // 是否正在查看历史记录（true 时提示"历史模式"，开始新分析会自动退出）
   const isHistoryView = ref(false)
+  // 当前正在看的 history 记录 id：分析完成后由 saved 事件填充；点开历史时填充；用于 commit/revert 定位
+  const historyRecordId = ref<number | null>(null)
+  // 当前记录在 DB 里的处置状态：'committed' | 'reverted' | null（用于回看时灰按钮）
+  const commitStatus = ref<null | 'committed' | 'reverted'>(null)
 
   // ----- Live 快照（独立于 UI 显示）-----
   const live = ref<LiveSnapshot | null>(null)
@@ -224,6 +228,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     changedFiles.value = []
     changeAction.value = ''
     changeMessage.value = ''
+    historyRecordId.value = null
+    commitStatus.value = null
     doneMeta.value = null
     clearUiStepMap()
     isHistoryView.value = false
@@ -240,6 +246,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
    * 仅当 UI 当前就在 live 视图时，才同步渲染到 UI。
    */
   function handleEvent(ev: AgentEvent) {
+    // 服务端落库成功后下发本次分析的 history id（与 UI 显示无关，先捕获）
+    if (ev.type === 'saved') {
+      historyRecordId.value = ev.id
+      return
+    }
+
     // 1) 始终更新 live 快照（live 不存在就忽略——"已结束/未启动"的旧调用）
     const ls = live.value
     if (!ls) return
@@ -313,6 +325,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     if (viewingLive.value) resetAnalysis()
     live.value = null
     liveStepByToolId.clear()
+    commitStatus.value = null
   }
 
   /**
@@ -333,6 +346,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     doneMeta.value = null
     isHistoryView.value = false
     viewingLive.value = false
+    historyRecordId.value = null
+    commitStatus.value = null
     clearUiStepMap()
     // 丢 live 快照（已落库的不动，本次放弃）
     live.value = null
@@ -366,6 +381,17 @@ export const useAnalysisStore = defineStore('analysis', () => {
   function loadHistoryRecord(record: HistoryRecord) {
     isHistoryView.value = true
     viewingLive.value = false
+    historyRecordId.value = record.id
+    commitStatus.value = (record.commit_status as null | 'committed' | 'reverted') ?? null
+    // 同步 UI 状态：已处置的记录直接显示为终态
+    if (commitStatus.value === 'committed') {
+      changeAction.value = 'committed'
+      changeMessage.value = ''
+      reviewUrl.value = record.review_url ?? ''
+    } else if (commitStatus.value === 'reverted') {
+      changeAction.value = 'reverted'
+      changeMessage.value = '已恢复，代码改动已撤销'
+    }
     const ds = freshDisplay()
     const tmpStepByToolId = new Map<string, number>()
     for (const ev of record.events) {
@@ -398,6 +424,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     doneMeta,
     role,
     isHistoryView,
+    historyRecordId,
+    commitStatus,
     // live 相关
     live,
     hasLive,

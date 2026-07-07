@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import { runGit } from "./analyze.js";
 import { createIssueComment } from "../plane.js";
+import { markAnalysisCommitted, markAnalysisReverted } from "../db.js";
 
 function codeRootOrThrow(): string {
   const root = process.env.LOCAL_CODE_ROOT;
@@ -23,6 +24,8 @@ const body = z.object({
   workspaceSlug: z.string().min(1),
   issueIdentifier: z.string().min(1),
   title: z.string().optional(),
+  // 可选：本次操作对应的 history 记录 id，用于把 commit_status/reverted_at 持久化
+  historyId: z.number().int().positive().optional(),
 });
 
 export async function registerChangesRoutes(app: FastifyInstance) {
@@ -82,7 +85,18 @@ export async function registerChangesRoutes(app: FastifyInstance) {
         req.log.warn({ err: e }, "createIssueComment failed (commit itself still succeeded)");
       }
 
-      return { ok: true, reviewUrl: reviewUrl ?? null, commentPosted, commentError };
+      // 把这次提交状态写到历史记录里（不阻塞 commit 的成功路径）
+      let historyMarked = false;
+      if (parse.data.historyId != null) {
+        try {
+          historyMarked = markAnalysisCommitted(parse.data.historyId, reviewUrl);
+          req.log.info({ historyId: parse.data.historyId, historyMarked }, "history marked committed");
+        } catch (e) {
+          req.log.warn({ e }, "markAnalysisCommitted failed (commit itself still succeeded)");
+        }
+      }
+
+      return { ok: true, reviewUrl: reviewUrl ?? null, commentPosted, commentError, historyMarked };
     } catch (err: any) {
       req.log.error({ err }, "changes/commit failed");
       return reply.code(500).send({ ok: false, error: err?.message ?? String(err) });
@@ -91,12 +105,27 @@ export async function registerChangesRoutes(app: FastifyInstance) {
 
   // 取消恢复：回到改动前的 HEAD（Agent 未提交，故 HEAD 即改动前状态）
   app.post("/changes/revert", async (req, reply) => {
+    const parse = body.safeParse(req.body);
+    if (!parse.success) {
+      return reply.code(400).send({ ok: false, error: "参数错误", detail: parse.error.flatten() });
+    }
     try {
       const root = codeRootOrThrow();
       // reset --hard HEAD 还原所有被跟踪文件的改动；add 过的暂存区也一并清掉
       runGit(["reset", "--hard", "HEAD"], root);
       req.log.info("changes/revert done: reset --hard HEAD");
-      return { ok: true };
+
+      // 把这次恢复状态写到历史记录里
+      let historyMarked = false;
+      if (parse.data.historyId != null) {
+        try {
+          historyMarked = markAnalysisReverted(parse.data.historyId);
+          req.log.info({ historyId: parse.data.historyId, historyMarked }, "history marked reverted");
+        } catch (e) {
+          req.log.warn({ e }, "markAnalysisReverted failed (revert itself still succeeded)");
+        }
+      }
+      return { ok: true, historyMarked };
     } catch (err: any) {
       req.log.error({ err }, "changes/revert failed");
       return reply.code(500).send({ ok: false, error: err?.message ?? String(err) });

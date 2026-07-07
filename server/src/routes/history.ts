@@ -60,6 +60,8 @@ function toSummary(r: Record<string, unknown>) {
     cost_usd: r.cost_usd,
     num_turns: r.num_turns,
     review_url: r.review_url,
+    commit_status: r.commit_status ?? null,
+    reverted_at: r.reverted_at ?? null,
   };
 }
 

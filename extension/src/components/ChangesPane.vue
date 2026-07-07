@@ -11,7 +11,13 @@ const { parsedUrl } = usePlaneUrl()
 const selectedPath = ref<string | null>(null)
 
 const files = computed(() => analysisStore.changedFiles)
-const resolved = computed(() => analysisStore.changeAction === 'committed' || analysisStore.changeAction === 'reverted')
+// 已处置（含回看历史时的持久化状态）就锁住按钮
+const resolved = computed(() =>
+  analysisStore.changeAction === 'committed' ||
+  analysisStore.changeAction === 'reverted' ||
+  analysisStore.commitStatus === 'committed' ||
+  analysisStore.commitStatus === 'reverted'
+)
 
 const current = computed(() => {
   if (!selectedPath.value) return files.value[0] ?? null
@@ -59,6 +65,8 @@ async function callChanges(path: 'commit' | 'revert') {
       body: JSON.stringify({
         ...parsedUrl.value,
         title: analysisStore.issue?.title,
+        // 告诉服务端本次操作对应哪条 history 记录，用于落库（commit_status / reverted_at）
+        historyId: analysisStore.historyRecordId,
       }),
     })
     const data = await res.json().catch(() => ({}))
@@ -68,6 +76,7 @@ async function callChanges(path: 'commit' | 'revert') {
     if (path === 'commit') {
       analysisStore.changeAction = 'committed'
       analysisStore.reviewUrl = data.reviewUrl || ''
+      analysisStore.commitStatus = 'committed'
       const reviewMsg = data.reviewUrl ? '已提交到 Gerrit' : '已提交（未解析到 review 链接）'
       if (data.commentPosted) {
         analysisStore.changeMessage = `${reviewMsg} · 已在 Plane 留评论（AI 标识）`
@@ -78,6 +87,7 @@ async function callChanges(path: 'commit' | 'revert') {
       }
     } else {
       analysisStore.changeAction = 'reverted'
+      analysisStore.commitStatus = 'reverted'
       analysisStore.changeMessage = '已恢复，代码改动已撤销'
     }
   } catch (err: unknown) {

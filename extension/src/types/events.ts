@@ -61,6 +61,10 @@ export interface HistorySummary {
   cost_usd: number | null
   num_turns: number | null
   review_url: string | null
+  // 用户对这次改动的处置：null 未处置 | 'committed' 已提交 | 'reverted' 已恢复
+  commit_status: string | null
+  // 恢复时间（仅 commit_status='reverted' 时有值）
+  reverted_at: string | null
 }
 
 // 历史记录详情（GET /history/:id）；events 为当时的完整事件流，可重新喂给 handleEvent 还原界面
