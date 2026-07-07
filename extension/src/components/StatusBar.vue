@@ -36,14 +36,9 @@ const analysisStore = useAnalysisStore()
 }
 .progress-fill {
   height: 100%;
+  width: 35%;
   background: var(--primary);
   border-radius: 2px;
-  animation: slide 1.2s ease-in-out infinite;
-}
-@keyframes slide {
-  0% { width: 0%; margin-left: 0; }
-  50% { width: 70%; margin-left: 15%; }
-  100% { width: 0%; margin-left: 100%; }
 }
 .status-text {
   font-size: 12px;

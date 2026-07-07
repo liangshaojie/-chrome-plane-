@@ -316,6 +316,30 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   /**
+   * 用户点「停止」后调用：清空当前分析的步骤记录、结果、代码改动；
+   * 保留 statusMessage 里的「已停止」文案 + issue 信息；
+   * 同时丢弃 live 快照（本次分析不落库）。
+   */
+  function abortAndClear() {
+    // 清 UI 显示态：保留 phase=analyzing（让进度条区域占位也保留）与 statusMessage
+    // 以及 issue（已经拉到了）+ role；其他步骤类信息全部清空
+    phase.value = 'idle'
+    steps.value = []
+    outputText.value = ''
+    reviewUrl.value = ''
+    changedFiles.value = []
+    changeAction.value = ''
+    changeMessage.value = ''
+    doneMeta.value = null
+    isHistoryView.value = false
+    viewingLive.value = false
+    clearUiStepMap()
+    // 丢 live 快照（已落库的不动，本次放弃）
+    live.value = null
+    liveStepByToolId.clear()
+  }
+
+  /**
    * 把 UI 切到 live 视图。如果当前不在 live（点了历史），把 live 快照同步到 UI。
    * 如果没有 live 快照则 no-op。
    */
@@ -387,5 +411,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     endLive,
     showLive,
     clearLive,
+    abortAndClear,
   }
 })

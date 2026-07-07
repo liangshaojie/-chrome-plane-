@@ -650,19 +650,6 @@ function fmtCost(c: number | null): string {
   height: 6px;
   border-radius: 50%;
   background: #60a5fa;
-  box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7);
-  animation: live-pulse 1.2s ease-out infinite;
-}
-@keyframes live-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.6);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(96, 165, 250, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
-  }
 }
 .current-view-tag {
   color: var(--primary);

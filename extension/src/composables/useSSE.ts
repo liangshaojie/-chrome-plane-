@@ -130,6 +130,8 @@ export function useSSE() {
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         analysisStore.setStatus('已停止')
+        // 主动放弃本次分析：清掉步骤记录与 live 快照（已落库的真实记录不受影响）
+        analysisStore.abortAndClear()
       } else {
         const msg = err instanceof Error ? err.message : String(err)
         analysisStore.setStatus(msg)
