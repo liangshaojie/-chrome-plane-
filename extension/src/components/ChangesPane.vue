@@ -3,21 +3,12 @@ import { ref, computed } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlaneUrl } from '@/composables/usePlaneUrl'
-import ChatDialog from './ChatDialog.vue'
 
 const analysisStore = useAnalysisStore()
 const settingsStore = useSettingsStore()
 const { parsedUrl } = usePlaneUrl()
 
 const selectedPath = ref<string | null>(null)
-const showChat = ref(false)
-
-function openChat() {
-  showChat.value = true
-}
-function closeChat() {
-  showChat.value = false
-}
 
 const files = computed(() => analysisStore.changedFiles)
 // 已处置（含回看历史时的持久化状态）就锁住按钮
@@ -58,7 +49,17 @@ async function callChanges(path: 'commit' | 'revert') {
     analysisStore.changeMessage = '请填写后端地址'
     return
   }
-  if (!parsedUrl.value) {
+  // 优先用当前 tab URL 解析，失败则从 analysisStore.issue 回退
+  let wsSlug = parsedUrl.value?.workspaceSlug
+  let issIdent = parsedUrl.value?.issueIdentifier
+  if (!wsSlug || !issIdent) {
+    const issue = analysisStore.issue
+    if (issue?.identifier) {
+      wsSlug = issue.identifier.split('-')[0] || ''
+      issIdent = issue.identifier
+    }
+  }
+  if (!wsSlug || !issIdent) {
     analysisStore.changeAction = 'error'
     analysisStore.changeMessage = '未识别到 Plane issue 链接'
     return
@@ -69,7 +70,8 @@ async function callChanges(path: 'commit' | 'revert') {
 
   try {
     const body: Record<string, unknown> = {
-      ...parsedUrl.value,
+      workspaceSlug: wsSlug,
+      issueIdentifier: issIdent,
       title: analysisStore.issue?.title,
     }
     // 没有对应的 history 记录（极少见，比如老数据库 / 测试脚本），就不发该字段
@@ -126,15 +128,6 @@ async function callChanges(path: 'commit' | 'revert') {
             {{ analysisStore.changeAction === 'committing' ? '提交中…' : '确认合并并提交' }}
           </button>
           <button
-            v-if="analysisStore.role === 'developer'"
-            class="btn chat"
-            :disabled="resolved || analysisStore.changeAction === 'committing' || analysisStore.changeAction === 'reverting'"
-            title="对当前 diff 不满意？与 Claude 多轮对话继续修改（developer 模式）"
-            @click="openChat"
-          >
-            接着追问
-          </button>
-          <button
             class="btn cancel"
             :disabled="resolved || analysisStore.changeAction === 'committing' || analysisStore.changeAction === 'reverting'"
             @click="callChanges('revert')"
@@ -185,9 +178,6 @@ async function callChanges(path: 'commit' | 'revert') {
       <p>暂无代码改动</p>
       <p class="empty-sub">Agent 修改代码后，这里会展示 diff 供你确认</p>
     </div>
-
-    <!-- 接着追问对话弹框（developer 模式） -->
-    <ChatDialog :open="showChat" @close="closeChat" />
   </div>
 </template>
 
@@ -221,8 +211,6 @@ async function callChanges(path: 'commit' | 'revert') {
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.confirm { background: var(--success); color: #fff; border-color: var(--success); }
-.btn.chat { background: var(--primary-bg, rgba(59,130,246,0.12)); color: var(--primary); border-color: rgba(59,130,246,0.3); }
-.btn.chat:hover:not(:disabled) { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn.cancel { background: var(--bg-secondary); color: var(--text); }
 
 .action-status {

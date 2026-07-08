@@ -8,6 +8,7 @@ import TabNav from '@/components/TabNav.vue'
 import ProcessLog from '@/components/ProcessLog.vue'
 import OutputPane from '@/components/OutputPane.vue'
 import ChangesPane from '@/components/ChangesPane.vue'
+import ChatBar from '@/components/ChatBar.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAnalysisStore } from '@/stores/analysis'
 
@@ -40,6 +41,7 @@ watch(
       <OutputPane v-show="activeTab === 'result'" />
       <ChangesPane v-show="activeTab === 'changes'" />
     </div>
+    <ChatBar />
   </div>
 </template>
 

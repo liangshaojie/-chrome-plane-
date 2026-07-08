@@ -7,7 +7,7 @@
  *  3. TopBar 顶栏右侧版本号会读取 APP_VERSION，点击弹框读取 CHANGELOG
  */
 
-export const APP_VERSION = '0.6.0'
+export const APP_VERSION = '0.7.0'
 
 export interface ChangelogEntry {
   /** 版本号，遵循 semver */
@@ -24,6 +24,19 @@ export interface ChangelogEntry {
  * 当前条目（0.4.0）的 items 会同步渲染到"分析结果 tab"无结果时也会展示。
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.7.0',
+    date: '2026-07-09',
+    items: [
+      '新增：插件底部常驻「接着追问」输入栏（ChatBar），仅 developer 角色可见，分析进行中自动禁用',
+      '输入栏支持图片上传：点击📎附件按钮选择文件 / Ctrl+V 粘贴截图，图片 base64 落盘到 temp 并告知 agent 路径',
+      '追问过程中的分析步骤实时同步到「过程分析」tab，文本累积到「分析结果」tab，代码改动自动刷新「代码改动」tab',
+      '后端 /chat 接口新增 images 字段支持 + 对话结束后自动计算 git diff 推送 changes 事件',
+      '修复：追问完成后输入框仍然禁用的 bug（chat store 流结束后未重置 phase 为 idle）',
+      '修复：「确认合并并提交」提示未识别到 Plane issue 链接（现从 analysisStore.issue 回退解析，不再依赖当前 tab URL）',
+      '移除代码改动 tab 中的弹窗式「接着追问」按钮，改为底部常驻输入栏',
+    ],
+  },
   {
     version: '0.6.0',
     date: '2026-07-08',

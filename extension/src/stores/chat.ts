@@ -1,10 +1,19 @@
 // 多轮「接着追问」对话的 store
 // 状态：messages（按时间顺序，role=user|assistant）、phase、streamingText（agent 流式回包）
 // 调 /chat SSE 接口，把流式事件累积到 messages 里。
+// 同时把 SSE 事件转发给 analysis store，让过程/结果/代码改动 tab 实时跟新。
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { AgentEvent } from '@/types/events'
+import { useAnalysisStore } from './analysis'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
+
+export interface ChatImage {
+  filename: string
+  data: string  // base64 编码
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+}
 
 export interface ChatMessage {
   role: ChatRole
@@ -13,6 +22,8 @@ export interface ChatMessage {
   streaming?: boolean
   /** 流式状态中累积的临时文本，用于打字机效果 */
   streamingContent?: string
+  /** 用户消息附带的图片（发出去时带上，用于在气泡里展示） */
+  images?: ChatImage[]
 }
 
 export interface ChatContext {
@@ -47,8 +58,9 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 发一条消息给后端 /chat，监听 SSE 流式回包。
    * 调用前：用户输入的文本已经 addUserMessage 加到 messages 里。
+   * @param images 可选，用户附带的图片（base64）
    */
-  async function send(ctx: ChatContext, serverUrl: string) {
+  async function send(ctx: ChatContext, serverUrl: string, images?: ChatImage[]) {
     if (phase.value === 'sending' || phase.value === 'streaming') return
     const url = serverUrl.replace(/\/$/, '')
     if (!url) {
@@ -58,6 +70,10 @@ export const useChatStore = defineStore('chat', () => {
     }
     phase.value = 'sending'
     error.value = ''
+
+    // 开始新一轮追问：让 analysis store 建立新 live 快照（保留 issue/changedFiles）
+    const analysisStore = useAnalysisStore()
+    analysisStore.continueLive('developer')
 
     // 取最近一条 user 消息作为本轮问题
     const lastUser = [...messages.value].reverse().find((m) => m.role === 'user')
@@ -75,15 +91,23 @@ export const useChatStore = defineStore('chat', () => {
     const placeholderIdx = messages.value.length - 1
 
     try {
+      const body: Record<string, unknown> = {
+        analysisId: ctx.analysisId,
+        workspaceSlug: ctx.workspaceSlug,
+        issueIdentifier: ctx.issueIdentifier,
+        message: lastUser.content,
+      }
+      if (images?.length) {
+        body.images = images.map((img) => ({
+          filename: img.filename,
+          data: img.data,
+          mimeType: img.mimeType,
+        }))
+      }
       const res = await fetch(`${url}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          analysisId: ctx.analysisId,
-          workspaceSlug: ctx.workspaceSlug,
-          issueIdentifier: ctx.issueIdentifier,
-          message: lastUser.content,
-        }),
+        body: JSON.stringify(body),
         signal: abortCtrl.value.signal,
       })
       if (!res.ok || !res.body) {
@@ -114,15 +138,20 @@ export const useChatStore = defineStore('chat', () => {
             continue
           }
           handleChatEvent(ev, placeholderIdx)
+          // 同时转发给 analysis store，让过程/结果/代码改动 tab 实时跟新
+          forwardToAnalysis(ev)
         }
       }
       // 流结束：把 placeholder 的 streamingContent 合到 content
       finalizePlaceholder(placeholderIdx)
+      phase.value = 'idle'
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         error.value = '已停止'
+        phase.value = 'idle'  // 用户主动停止，恢复可用
       } else {
         error.value = err instanceof Error ? err.message : String(err)
+        phase.value = 'error'
       }
       // 失败的占位要么保留作为错误展示，要么移除
       const ph = messages.value[placeholderIdx]
@@ -131,7 +160,6 @@ export const useChatStore = defineStore('chat', () => {
       } else {
         finalizePlaceholder(placeholderIdx)
       }
-      phase.value = 'error'
     } finally {
       abortCtrl.value = null
     }
@@ -182,6 +210,62 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /**
+   * 把 SSE 事件转发给 analysis store，让过程/结果/代码改动 tab 实时跟新。
+   * chat SSE 的事件格式和 AgentEvent 基本一致，直接透传即可。
+   */
+  function forwardToAnalysis(ev: any) {
+    const analysisStore = useAnalysisStore()
+    // 构造符合 AgentEvent 接口的事件对象
+    let agentEv: AgentEvent | null = null
+    switch (ev.type) {
+      case 'status':
+        agentEv = { type: 'status', message: String(ev.message ?? '') }
+        break
+      case 'text':
+        agentEv = { type: 'text', text: String(ev.text ?? '') }
+        break
+      case 'thinking':
+        agentEv = { type: 'thinking', text: String(ev.text ?? '') }
+        break
+      case 'tool_use':
+        agentEv = { type: 'tool_use', id: String(ev.id ?? ''), name: String(ev.name ?? ''), input: ev.input }
+        break
+      case 'tool_result':
+        agentEv = { type: 'tool_result', toolUseId: String(ev.toolUseId ?? ''), content: String(ev.content ?? ''), isError: Boolean(ev.isError) }
+        break
+      case 'done':
+        agentEv = {
+          type: 'done',
+          subtype: String(ev.subtype ?? 'ok'),
+          durationMs: ev.durationMs,
+          costUsd: ev.costUsd,
+          numTurns: ev.numTurns,
+        }
+        break
+      case 'error':
+        agentEv = { type: 'error', message: String(ev.message ?? '') }
+        break
+      case 'changes':
+        // changes 事件：后端算出的新 diff，覆盖 analysis store 的 changedFiles
+        if (Array.isArray(ev.files)) {
+          agentEv = { type: 'changes', files: ev.files }
+        }
+        break
+      case 'end':
+        // 结束后标记 live 为 done
+        analysisStore.endLive()
+        return
+      case 'saved':
+      case 'sessionId':
+        // 结构性事件，不转发
+        return
+    }
+    if (agentEv) {
+      analysisStore.handleEvent(agentEv)
+    }
+  }
+
   function finalizePlaceholder(idx: number) {
     const ph = messages.value[idx]
     if (!ph) return
@@ -197,8 +281,10 @@ export const useChatStore = defineStore('chat', () => {
     abortCtrl.value = null
   }
 
-  function addUserMessage(text: string) {
-    messages.value.push({ role: 'user', content: text })
+  function addUserMessage(text: string, images?: ChatImage[]) {
+    const msg: ChatMessage = { role: 'user', content: text }
+    if (images?.length) msg.images = images
+    messages.value.push(msg)
   }
 
   return {

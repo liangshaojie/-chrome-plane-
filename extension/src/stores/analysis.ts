@@ -311,6 +311,41 @@ export const useAnalysisStore = defineStore('analysis', () => {
     liveStepByToolId.clear()
   }
 
+  /**
+   * 「接着追问」多轮对话时调用：保留 issue / changedFiles，清空步骤/结果，建立新 live 快照。
+   * 这样过程 tab 会重新显示新一轮的分析步骤，结果 tab 会累积新文本，代码改动 tab 在 agent 改完后刷新。
+   */
+  function continueLive(currentRole: UserRole) {
+    // 保留 issue 和 changedFiles（之前的代码改动）
+    const keepIssue = issue.value
+    const keepChangedFiles = [...changedFiles.value]
+    // 重置步骤/结果/状态，但不清 live 快照
+    viewingLive.value = true
+    isHistoryView.value = false
+    changeAction.value = ''
+    changeMessage.value = ''
+    doneMeta.value = null
+    clearUiStepMap()
+    // 建立新 live 快照，但初始化时就带上保留的 issue 和 changedFiles
+    const ds = freshDisplay()
+    ds.issue = keepIssue ? { ...keepIssue } : null
+    ds.changedFiles = keepChangedFiles.map((f) => ({ ...f }))
+    ds.phase = 'analyzing'
+    ds.statusMessage = '接着追问中…'
+    const ls: LiveSnapshot = {
+      phase: 'analyzing',
+      startedAt: Date.now(),
+      role: currentRole,
+      display: ds,
+      pendingEvents: [],
+    }
+    paintDisplay(ds)
+    phase.value = 'analyzing'
+    statusMessage.value = '接着追问中…'
+    live.value = ls
+    liveStepByToolId.clear()
+  }
+
   /** useSSE finally 调用：标记 live 阶段为 done（UI 上仍有"新完成"提示） */
   function endLive() {
     if (live.value) live.value.phase = 'done'
@@ -436,6 +471,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     setStatus,
     handleEvent,
     beginLive,
+    continueLive,
     endLive,
     showLive,
     clearLive,
