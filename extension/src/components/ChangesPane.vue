@@ -185,10 +185,10 @@ async function callChanges(path: 'commit' | 'revert') {
       <p>暂无代码改动</p>
       <p class="empty-sub">Agent 修改代码后，这里会展示 diff 供你确认</p>
     </div>
-  </div>
 
-  <!-- 接着追问对话弹框（developer 模式） -->
-  <ChatDialog :open="showChat" @close="closeChat" />
+    <!-- 接着追问对话弹框（developer 模式） -->
+    <ChatDialog :open="showChat" @close="closeChat" />
+  </div>
 </template>
 
 <style scoped>
