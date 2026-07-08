@@ -54,7 +54,7 @@ export async function registerChangesRoutes(app: FastifyInstance) {
       runGit(["add", "-A"], root);
 
       const subject = (title || issueIdentifier).replace(/\s+/g, " ").trim().slice(0, 80);
-      const commitMsg = `feat: ${subject}\n\nIssue: #${issueIdentifier}`;
+      const commitMsg = `feat: ${subject}\n\nissue: #${issueIdentifier}`;
       runGit(["commit", "-m", commitMsg], root);
 
       // 推送到 Gerrit；runGit 已合并 stdout+stderr，Gerrit 链接在其中
