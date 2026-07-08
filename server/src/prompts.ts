@@ -39,6 +39,11 @@ export function buildSystemPrompt(role: UserRole = "developer", codeRoot?: strin
 
   const outputRules = [
     "请用 Markdown 输出，结构清晰、要点突出，使用中文。",
+    "",
+    "## 可沉淀的经验（必加）",
+    "在你的最终回复**末尾**追加一节 `## 可沉淀的经验`，列 1~3 条本次分析发现的、文档里查不到的项目特有知识。",
+    "每条 ≤ 30 字，按以下类型之一标注前缀（坑点/业务规则/模块依赖/性能/反模式）。",
+    "这部分会单独被提炼到项目 skill，不混入主体分析。",
   ];
 
   return [...commonRules, ...roleSpecificRules, ...outputRules].join("\n");
