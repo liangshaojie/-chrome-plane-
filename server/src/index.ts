@@ -10,8 +10,7 @@ import { registerChangesRoutes } from "./routes/changes.js";
 import { registerIssueDetailRoute } from "./routes/issue-detail.js";
 import { registerProxyImageRoute } from "./routes/proxy-image.js";
 import { registerHistoryRoutes } from "./routes/history.js";
-import Database from "better-sqlite3";
-import path from "node:path";
+import { registerChatRoute } from "./routes/chat.js";
 
 // Fix: Windows 终端中文乱码，设置代码页为 UTF-8
 if (process.platform === "win32") {
@@ -42,27 +41,6 @@ app.get("/health", async () => ({
 }));
 
 /**
- * 调试端点：返回 server 实际看到的 db 路径 + 总行数 + 自增计数。
- * 用来排查「分析写库但历史列表为空」类问题：能看到 server 进程自己读到的 db 与文件系统上的 db 是不是同一个。
- */
-app.get("/debug/db", async () => {
-  const cwd = process.cwd();
-  const dbPath = path.resolve(cwd, "data", "analyzer.db");
-  let total = null;
-  let seq: Array<{ name: string; seq: number }> = [];
-  let openErr: string | null = null;
-  try {
-    const db = new Database(dbPath, { readonly: true, fileMustExist: false });
-    total = (db.prepare("SELECT COUNT(*) AS n FROM analyses").get() as { n: number }).n;
-    seq = db.prepare("SELECT name, seq FROM sqlite_sequence").all() as Array<{ name: string; seq: number }>;
-    db.close();
-  } catch (e) {
-    openErr = (e as Error).message;
-  }
-  return { cwd, dbPath, total, seq, openErr };
-});
-
-/**
  * 注册路由
  */
 await registerAnalyzeRoute(app);
@@ -70,6 +48,7 @@ await registerChangesRoutes(app);
 await registerIssueDetailRoute(app);
 await registerProxyImageRoute(app);
 await registerHistoryRoutes(app);
+await registerChatRoute(app);
 
 /**
  * 启动服务器

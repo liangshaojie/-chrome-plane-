@@ -41,6 +41,27 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_analyses_created ON analyses(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_analyses_issue ON analyses(issue_identifier);
+
+  -- 对话会话：每次「接着追问」在同一 analysis 下复用同一个 session
+  CREATE TABLE IF NOT EXISTS chat_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    analysis_id INTEGER,
+    workspace_slug TEXT,
+    issue_identifier TEXT,
+    issue_title TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_sessions_analysis ON chat_sessions(analysis_id);
+
+  -- 对话消息：role='user' | 'assistant'，按 id ASC 拼成历史传给 agent
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, id);
 `);
 
 // 兼容已有库：老库没新列，补上（CREATE TABLE 加了 IF NOT EXISTS，老库不会再创建）
@@ -148,4 +169,72 @@ const revertUpdateStmt = db.prepare(`
 `);
 export function markAnalysisReverted(id: number): boolean {
   return revertUpdateStmt.run({ id, reverted_at: new Date().toISOString() }).changes > 0;
+}
+
+/* ---------------- 对话会话（多轮追问） ---------------- */
+
+export interface ChatSessionRow {
+  id?: number;
+  created_at: string;
+  analysis_id: number | null;
+  workspace_slug: string | null;
+  issue_identifier: string | null;
+  issue_title: string | null;
+}
+
+export interface ChatMessageRow {
+  id?: number;
+  session_id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
+/** 取该 analysis 关联的最新 session，没有就新建一个 */
+export function getOrCreateChatSession(opts: {
+  analysisId: number | null;
+  workspaceSlug: string;
+  issueIdentifier: string;
+  issueTitle: string | null;
+}): ChatSessionRow {
+  if (opts.analysisId != null) {
+    const existing = db
+      .prepare('SELECT * FROM chat_sessions WHERE analysis_id = ? ORDER BY id DESC LIMIT 1')
+      .get(opts.analysisId) as ChatSessionRow | undefined;
+    if (existing) return existing;
+  }
+  const row: ChatSessionRow = {
+    created_at: new Date().toISOString(),
+    analysis_id: opts.analysisId,
+    workspace_slug: opts.workspaceSlug,
+    issue_identifier: opts.issueIdentifier,
+    issue_title: opts.issueTitle,
+  };
+  const info = db
+    .prepare(`
+      INSERT INTO chat_sessions (created_at, analysis_id, workspace_slug, issue_identifier, issue_title)
+      VALUES (@created_at, @analysis_id, @workspace_slug, @issue_identifier, @issue_title)
+    `)
+    .run(row);
+  return { ...row, id: Number(info.lastInsertRowid) };
+}
+
+export function getChatSession(id: number): ChatSessionRow | undefined {
+  return db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id) as ChatSessionRow | undefined;
+}
+
+export function listChatMessages(sessionId: number): ChatMessageRow[] {
+  return db
+    .prepare('SELECT * FROM chat_messages WHERE session_id = ? ORDER BY id ASC')
+    .all(sessionId) as ChatMessageRow[];
+}
+
+export function appendChatMessage(row: ChatMessageRow): number {
+  const info = db
+    .prepare(`
+      INSERT INTO chat_messages (session_id, role, content, created_at)
+      VALUES (@session_id, @role, @content, @created_at)
+    `)
+    .run(row);
+  return Number(info.lastInsertRowid);
 }

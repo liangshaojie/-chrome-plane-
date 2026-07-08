@@ -116,11 +116,7 @@ function persistAnalysis(
   events: any[],
   meta: { workspaceSlug: string; issueIdentifier: string; role: UserRole }
 ): number | null {
-  console.log(`[history] persistAnalysis called: events.length=${events.length} meta=${JSON.stringify(meta)}`);
-  if (!events.length) {
-    console.log('[history] events is empty, return null (skip insert)');
-    return null;
-  }
+  if (!events.length) return null;
   const outputText = events
     .filter((e) => e.type === "text")
     .map((e: any) => e.text ?? "")
@@ -155,10 +151,7 @@ function persistAnalysis(
     commit_status: null,
     reverted_at: null,
   };
-  console.log(`[history] row about to insert: identifier=${row.issue_identifier} status=${row.status} role=${row.role} events_json_len=${row.events_json.length}`);
-  const id = insertAnalysis(row);
-  console.log(`[history] insert OK, id=${id}`);
-  return id;
+  return insertAnalysis(row);
 }
 
 /**
@@ -274,15 +267,11 @@ export async function registerAnalyzeRoute(app: FastifyInstance) {
     } finally {
       send({ type: "end" });
       // 从累积的事件流派生全部字段，落库为一条历史记录（落库失败不影响已返回的分析结果）
-      console.log(`[analyze] finally: events.length=${events.length} workspaceSlug=${workspaceSlug} issueIdentifier=${issueIdentifier}`);
       try {
         const recordId = persistAnalysis(events, { workspaceSlug, issueIdentifier, role });
-        console.log(`[analyze] persistAnalysis returned id=${recordId}`);
         if (recordId != null) send({ type: "saved", id: recordId });
-      } catch (e: any) {
-        console.error(`[analyze] persist FAILED: ${e?.message ?? e}`);
-        console.error(e?.stack);
-        req.log.warn({ e }, "persist analysis failed");
+      } catch (e) {
+        req.log.warn({ e, eventsLen: events.length }, "persist analysis failed");
       }
       reply.raw.end();
     }
