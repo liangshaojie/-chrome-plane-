@@ -7,7 +7,7 @@
  *  3. TopBar 顶栏右侧版本号会读取 APP_VERSION，点击弹框读取 CHANGELOG
  */
 
-export const APP_VERSION = '0.5.0'
+export const APP_VERSION = '0.6.0'
 
 export interface ChangelogEntry {
   /** 版本号，遵循 semver */
@@ -24,6 +24,18 @@ export interface ChangelogEntry {
  * 当前条目（0.4.0）的 items 会同步渲染到"分析结果 tab"无结果时也会展示。
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.6.0',
+    date: '2026-07-08',
+    items: [
+      '新增：「接着追问」多轮对话按钮，位于代码改动 tab 「确认合并并提交」与「取消并恢复」中间',
+      '该能力只在 developer 角色下可见，使用与初始代码改动流程一致的 Claude Agent SDK 调用（可读写代码、跑 bash）',
+      '对话上下文在同一 analysis_id 下复用同一个 chat_session，所有消息落库 SQLite（chat_sessions / chat_messages 两张新表）',
+      '后端新增 POST /chat SSE 流式接口 + GET /chat/:sessionId 拉历史接口；prompt = 系统提示 + 当前 issue 摘要 + 同一会话历史消息 + 最新问题',
+      '前端新增 ChatDialog 模态弹框（消息气泡 + 流式光标 + ESC/Shift+Enter 快捷键 + 停止按钮）和 chat Pinia store',
+      '每轮 user 消息立即落库，assistant 完整回复在 finally 里一次性入库——中途崩溃历史也保留',
+    ],
+  },
   {
     version: '0.5.0',
     date: '2026-07-07',
