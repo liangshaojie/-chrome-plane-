@@ -8,6 +8,28 @@ export interface ImageResult {
   mimeType: string;
 }
 
+/**
+ * 简易异步互斥锁：把任务串行化，避免并发登录 / 并发开多个 page 引发的竞态。
+ * 即使 fn 抛错也会释放锁，不会卡死队列。
+ */
+class AsyncMutex {
+  private tail: Promise<void> = Promise.resolve();
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.tail;
+    let release!: () => void;
+    this.tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    try {
+      await prev;
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+}
+
 // 环境变量
 const PLANE_EMAIL = process.env.PLAYWRIGHT_PLANE_EMAIL ?? process.env.PLANE_EMAIL;
 const PLANE_PASSWORD = process.env.PLAYWRIGHT_PLANE_PASSWORD ?? process.env.PLANE_PASSWORD;
@@ -37,6 +59,8 @@ export class PlaywrightImageDownloader {
   private context: BrowserContext | null = null;
   private initialized = false;
   private loggedIn = false;
+  // 串行化所有浏览器操作：登录、下载，避免并发请求互相干扰
+  private queue = new AsyncMutex();
 
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -55,7 +79,18 @@ export class PlaywrightImageDownloader {
     console.log("[playwright] Chromium 启动成功");
   }
 
+  /**
+   * 公开方法：保证已登录。外部直接调用安全（自带锁）。
+   */
   async ensureLoggedIn(): Promise<void> {
+    return this.queue.run(() => this.doLogin());
+  }
+
+  /**
+   * 内部实际登录流程。不加锁 —— 调用方必须已经持有 queue 锁，
+   * 否则会出现并发登录导致页面互相干扰。
+   */
+  private async doLogin(): Promise<void> {
     if (!this.context || !this.browser) {
       throw new Error("Playwright 未初始化");
     }
@@ -70,7 +105,10 @@ export class PlaywrightImageDownloader {
     try {
       // 访问登录页面
       console.log("[playwright] 访问 Plane 登录页...");
-      await page.goto(PLANE_INSTANCE_URL, { timeout: 15000 });
+      await page.goto(PLANE_INSTANCE_URL, {
+        timeout: 60000,
+        waitUntil: "domcontentloaded",
+      });
       await page.waitForLoadState("domcontentloaded");
       await new Promise(r => setTimeout(r, 2000));
 
@@ -116,13 +154,15 @@ export class PlaywrightImageDownloader {
   }
 
   async downloadImage(url: string): Promise<ImageResult | null> {
-    if (!this.context) {
-      throw new Error("Playwright 未初始化");
-    }
+    return this.queue.run(async () => {
+      if (!this.context) {
+        throw new Error("Playwright 未初始化");
+      }
 
-    await this.ensureLoggedIn();
+      // 已在 queue 锁内，直接调不加锁的 doLogin，避免重入死锁
+      await this.doLogin();
 
-    const page = await this.context.newPage();
+      const page = await this.context.newPage();
 
     try {
       console.log(`[playwright] 下载图片: ${url}`);
@@ -167,10 +207,16 @@ export class PlaywrightImageDownloader {
     } finally {
       await page.close();
     }
+    });
   }
 
   async downloadImages(urls: string[]): Promise<(ImageResult | null)[]> {
-    return Promise.all(urls.map((url) => this.downloadImage(url)));
+    // 内部已通过 queue 串行化，无需 Promise.all
+    const results: (ImageResult | null)[] = [];
+    for (const url of urls) {
+      results.push(await this.downloadImage(url));
+    }
+    return results;
   }
 
   async close(): Promise<void> {

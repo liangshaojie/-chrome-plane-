@@ -9,6 +9,7 @@ import { registerAnalyzeRoute } from "./routes/analyze.js";
 import { registerChangesRoutes } from "./routes/changes.js";
 import { registerIssueDetailRoute } from "./routes/issue-detail.js";
 import { registerProxyImageRoute } from "./routes/proxy-image.js";
+import { registerDownloadImagesRoute } from "./routes/download-images.js";
 import { registerHistoryRoutes } from "./routes/history.js";
 import { registerChatRoute } from "./routes/chat.js";
 
@@ -47,6 +48,7 @@ await registerAnalyzeRoute(app);
 await registerChangesRoutes(app);
 await registerIssueDetailRoute(app);
 await registerProxyImageRoute(app);
+await registerDownloadImagesRoute(app);
 await registerHistoryRoutes(app);
 await registerChatRoute(app);
 
