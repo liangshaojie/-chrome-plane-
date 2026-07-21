@@ -94,6 +94,30 @@ server/
 ### 3.5 `GET /proxy-image?url=<encoded>`  · [routes/proxy-image.ts](server/src/routes/proxy-image.ts)
 用 Playwright 单例下载图片（突破 Plane 的登录态/签名限制），返回 `{ ok, base64, mimeType }`。失败返回 502。
 
+### 3.6 `POST /download-images`  · [routes/download-images.ts](server/src/routes/download-images.ts)
+**Body**：`{ identifier?: string, urls: string[] }`（`identifier` 可选，默认 `adhoc-<ts>`）
+**响应**：`{ ok, identifier, count, successCount, files: [{ url, accessUrl, filename, ok, size?, mimeType?, error? }] }`
+
+服务端用 Playwright 下载成功后把图片落在 `os.tmpdir()/chrome-plane-images/<identifier>/image-N.<ext>`，同时为每张图生成一个对外可访问的 HTTP 链接：
+
+```
+http://<client-host>:<port>/images/<identifier>/image-1.png
+http://<client-host>:<port>/images/<identifier>/image-2.webp
+...
+```
+
+host 取自请求头 `Host`（兼容 `X-Forwarded-Host`），proto 取自 `X-Forwarded-Proto` 或 `req.protocol`——这样不管客户端用 `localhost`、`10.10.10.62` 还是反向代理域名访问，都能拼出**可被它自己再次访问**的 URL。
+
+客户端拿到 `accessUrl` 后可自行：
+
+```ts
+const r = await fetch(file.accessUrl);
+const blob = await r.blob();  // 自己决定存到 IndexedDB / chrome.storage / File System Access / 内存预览
+```
+
+### 3.7 `GET /images/<identifier>/<filename>`  · [routes/download-images.ts](server/src/routes/download-images.ts) 静态路由
+把 `IMAGE_ROOT`（默认 `os.tmpdir()/chrome-plane-images/`）下的图片文件以 HTTP 形式暴露。路径必须落在 `IMAGE_ROOT` 之内，防 `..` 穿越，违规返 400；文件不存在返 404。响应头带 `Content-Type`（按扩展名）和 `Cache-Control: public, max-age=3600`。
+
 ---
 
 ## 4. Plane API 封装  · [plane.ts](server/src/plane.ts)
